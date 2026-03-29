@@ -1,0 +1,1960 @@
+/***************
+* THE ADVANTAGE — WRITING PIPELINE v3
+* Complete system: onboarding, reminders, recognition, analytics,
+* roster, leaderboard, hall of fame, admin dashboards, and more.
+***************/
+function initializeAllSheets() {
+ensureTrackerSheet_();
+ensureRosterSheet_();
+ensureLeaderboardSheet_();
+ensureHofSheet_();
+ensurePublishedSheet_();
+ensureAnalyticsSheet_();
+Logger.log("All sheets initialized.");
+}
+/***************
+* CONFIG — edit this section only
+***************/
+const CONFIG = {
+// ── Form IDs ──────────────────────────────────────────────────────────────
+SIGNUP_FORM_ID: "1bnVR1oZw1zE6u4Z-qTi7CZ2cpfozY-fACJUBimAe2Mw",
+IDEA_FORM_ID: "1dxrkmomhLGuqIg8BNTwrX8M5k1B__3oiq--P0lxJuA4",
+DRAFT_FORM_ID: "1r964Jc3p0cpzYf7FrMKP3HLl-7opOYR4jcukfxCYJwY",
+// ── Sheet names ───────────────────────────────────────────────────────────
+TRACKER_SHEET: "WRITER_TRACKER",
+ROSTER_SHEET: "WRITER_ROSTER",
+LEADERBOARD_SHEET: "LEADERBOARD",
+HALL_OF_FAME_SHEET: "HALL_OF_FAME",
+ARCHIVE_SHEET: "ARCHIVE",
+PUBLISHED_SHEET: "PUBLISHED_ARTICLES",
+ANALYTICS_SHEET: "ANALYTICS",
+ERROR_SHEET: "PIPELINE_ERRORS",
+SIGNUP_RESPONSES_SHEET: "FORM_SIGNUPS",
+IDEA_RESPONSES_SHEET: "FORM_IDEAS",
+DRAFT_RESPONSES_SHEET: "FORM_DRAFTS",
+// ── Form question titles (must match exactly) ─────────────────────────────
+Q_EMAIL: "Email Address",
+Q_WRITER: "Writer Name",
+Q_IDEA_DATE: "Select your Ideas Due date",
+Q_DRAFT_DATE: "Select your Draft Due date",
+Q_TYPE: "Article Type",
+Q_ASSIGN: "Select your assignment",
+Q_IDEA1_TITLE: "Idea 1 Title",
+Q_IDEA1_PITCH: "Idea 1 Pitch",
+Q_IDEA2_TITLE: "Idea 2 Title",
+Q_IDEA2_PITCH: "Idea 2 Pitch",
+Q_DRAFT_LINK: "Draft Google Doc link",
+// ── Email addresses ───────────────────────────────────────────────────────
+ADMIN_EMAIL: "braydenokley13@gmail.com",
+JOURNAL_EMAIL: "theadvantagejournal@gmail.com",
+// ── Article types ─────────────────────────────────────────────────────────
+ARTICLE_TYPES: [
+"Opinion / Commentary",
+"Economic Analysis",
+"News & Current Events",
+"Research Deep-Dive",
+"Profile / Interview",
+"Policy Brief",
+"Economic Explainer"
+],
+// ── Scheduling ────────────────────────────────────────────────────────────
+LOOKAHEAD_DAYS: 60,
+// ── Reminder schedule (days BEFORE deadline) ──────────────────────────────
+IDEA_REMINDERS_DAYS_BEFORE: [7, 3, 1],
+DRAFT_REMINDERS_DAYS_BEFORE: [7, 3, 1],
+// ── Ghost / inactivity thresholds (days) ──────────────────────────────────
+GHOST_CHECKIN_DAYS: 14, // personal check-in after no activity
+MISS_YOU_EMAIL_DAYS: 60, // "we miss you" to writers who haven't signed up
+// ── Recognition thresholds ────────────────────────────────────────────────
+MILESTONE_COUNTS: [1, 3, 5, 10, 20],
+HALL_OF_FAME_COUNT: 10, // published articles needed for Hall of Fame
+// ── Writer of the Month: run on the 1st of each month ─────────────────────
+// ── End-of-season wrap: call sendEndOfSeasonEmails() manually ─────────────
+// ── WRITER_TRACKER columns (1-indexed) ───────────────────────────────────
+COL_WRITER: 1, // A
+COL_EMAIL: 2, // B
+COL_TYPE: 3, // C
+COL_CYCLE_ID: 4, // D
+COL_SIGNUP_DATE: 5, // E
+COL_IDEAS_DUE: 6, // F
+COL_DRAFT_DUE: 7, // G
+COL_IDEAS_SUBMITTED: 8, // H checkbox
+COL_IDEAS_SUBMITTED_AT:9, // I
+COL_IDEA1_TITLE: 10, // J
+COL_IDEA1_PITCH: 11, // K
+COL_IDEA2_TITLE: 12, // L
+COL_IDEA2_PITCH: 13, // M
+COL_IDEA_APPROVED: 14, // N checkbox
+COL_IDEA_APPROVED_AT: 15, // O
+COL_DRAFT_SUBMITTED: 16, // P checkbox
+COL_DRAFT_SUBMITTED_AT:17, // Q
+COL_DRAFT_LINK: 18, // R
+COL_NOTES: 19, // S (admin notes / revision notes)
+COL_STATUS: 20, // T
+COL_TOTAL_ARTICLES: 21, // U
+COL_ON_TIME_COUNT: 22, // V
+COL_LATE_COUNT: 23, // W
+COL_STREAK: 24, // X current consecutive on-time streak
+COL_PUBLISHED_LINK: 25, // Y live URL once published
+COL_PUBLISHED_AT: 26, // Z
+TRACKER_HEADERS: [
+"Writer Name","Email","Article Type","Cycle ID","Signup Date",
+"Ideas Due","Draft Due","Ideas Submitted","Ideas Submitted At",
+"Idea 1 Title","Idea 1 Pitch","Idea 2 Title","Idea 2 Pitch",
+"Idea Approved","Idea Approved At","Draft Submitted","Draft Submitted At",
+"Draft Link","Notes","Status","Total Articles",
+"On-Time Count","Late Count","Streak","Published Link","Published At"
+],
+// ── WRITER_ROSTER columns ─────────────────────────────────────────────────
+ROSTER_HEADERS: [
+"Writer Name","Email","Join Date","Status",
+"Total Articles","On-Time Rate","Current Streak","Last Active","Article Types"
+],
+// ── LEADERBOARD columns ───────────────────────────────────────────────────
+LEADERBOARD_HEADERS: [
+"Rank","Writer Name","Published Articles","On-Time Rate","Current Streak","Status"
+],
+// ── HALL_OF_FAME columns ──────────────────────────────────────────────────
+HOF_HEADERS: [
+"Writer Name","Email","Inducted","Total Articles","On-Time Rate","Best Streak","Article Types"
+],
+// ── PUBLISHED_ARTICLES columns ────────────────────────────────────────────
+PUBLISHED_HEADERS: [
+"Title","Writer","Article Type","Published Date","Live URL","Cycle ID","Word Count"
+],
+// ── ANALYTICS columns ─────────────────────────────────────────────────────
+ANALYTICS_HEADERS: [
+"Week Of","New Signups","Ideas Submitted","Drafts Submitted","Published","Late Ideas","Late Drafts","On-Time Rate","Active Writers"
+]
+};
+/***************
+* DATE + FORMATTING HELPERS
+***************/
+function tz_() { return Session.getScriptTimeZone(); }
+function ymd_(d) { return Utilities.formatDate(d, tz_(), "yyyy-MM-dd"); }
+function fmtDate_(d) { return Utilities.formatDate(d, tz_(), "EEEE, MMMM d, yyyy"); }
+function fmtShort_(d){ return Utilities.formatDate(d, tz_(), "M/d/yyyy"); }
+function fmtMon_(d) { return Utilities.formatDate(d, tz_(), "MMMM yyyy"); }
+function today_() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function daysUntil_(d) {
+const ms = new Date(d.getFullYear(), d.getMonth(), d.getDate()) - today_();
+return Math.round(ms / 86400000);
+}
+function daysSince_(d) { return -daysUntil_(d); }
+/***************
+* LATE-NOTICE THROTTLE HELPERS
+* Prevents the same "overdue" email from going out every single day.
+* Uses PropertiesService to record when each late notice was last sent.
+* Key format: LATE_<cycleId>_<kind>   value: yyyy-MM-dd of last send
+***************/
+function wasLateSentRecently_(cycleId, kind) {
+const props = PropertiesService.getScriptProperties();
+const lastSent = props.getProperty(`LATE_${cycleId}_${kind}`);
+if (!lastSent) return false;
+const parsed = parseDate_(lastSent);
+return parsed && daysSince_(parsed) < 7;
+}
+function recordLateSent_(cycleId, kind) {
+PropertiesService.getScriptProperties().setProperty(`LATE_${cycleId}_${kind}`, ymd_(today_()));
+}
+function clearLateSent_(cycleId, kind) {
+PropertiesService.getScriptProperties().deleteProperty(`LATE_${cycleId}_${kind}`);
+}
+function initials_(name) {
+return name.trim().split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).join("");
+}
+}
+/***************
+* STATUS FORMULA
+***************/
+function statusFormula_(r) {
+return `=IF($A${r}="","",`
++ `IF($Y${r}<>"","✅ Published",`
++ `IF($P${r}=TRUE,"📝 Editing",`
++ `IF(AND($N${r}=TRUE,$P${r}=FALSE),IF(TODAY()>$G${r},"🔴 Draft Late","🟡 Draft Pending"),`
++ `IF(AND($H${r}=TRUE,$N${r}=FALSE),"⏳ Awaiting Approval",`
++ `IF($H${r}=FALSE,IF(TODAY()>$F${r},"🔴 Ideas Late","🔵 Ideas Pending"),""))))))`;
+}
+/***************
+* SHEET HELPERS
+***************/
+function getOrCreateSheet_(ss, name, headers) {
+let sh = ss.getSheetByName(name);
+if (!sh) {
+sh = ss.insertSheet(name);
+if (headers && headers.length) {
+const hRange = sh.getRange(1, 1, 1, headers.length);
+hRange.setValues([headers]);
+hRange.setFontWeight("bold");
+hRange.setBackground("#0f1923");
+hRange.setFontColor("#ffffff");
+sh.setFrozenRows(1);
+}
+}
+return sh;
+}
+function ensureTrackerSheet_() {
+const ss = SpreadsheetApp.getActive();
+const sh = getOrCreateSheet_(ss, CONFIG.TRACKER_SHEET, CONFIG.TRACKER_HEADERS);
+["E","F","G","I","O","Q","Z"].forEach(col => {
+sh.getRange(`${col}2:${col}1000`).setNumberFormat("M/d/yyyy");
+});
+[CONFIG.COL_IDEAS_SUBMITTED, CONFIG.COL_IDEA_APPROVED, CONFIG.COL_DRAFT_SUBMITTED].forEach(col => {
+sh.getRange(2, col, 999, 1).insertCheckboxes();
+});
+return sh;
+}
+function ensureRosterSheet_() {
+return getOrCreateSheet_(SpreadsheetApp.getActive(), CONFIG.ROSTER_SHEET, CONFIG.ROSTER_HEADERS);
+}
+function ensureLeaderboardSheet_() {
+return getOrCreateSheet_(SpreadsheetApp.getActive(), CONFIG.LEADERBOARD_SHEET, CONFIG.LEADERBOARD_HEADERS);
+}
+function ensureHofSheet_() {
+return getOrCreateSheet_(SpreadsheetApp.getActive(), CONFIG.HALL_OF_FAME_SHEET, CONFIG.HOF_HEADERS);
+}
+function ensurePublishedSheet_() {
+return getOrCreateSheet_(SpreadsheetApp.getActive(), CONFIG.PUBLISHED_SHEET, CONFIG.PUBLISHED_HEADERS);
+}
+function ensureAnalyticsSheet_() {
+return getOrCreateSheet_(SpreadsheetApp.getActive(), CONFIG.ANALYTICS_SHEET, CONFIG.ANALYTICS_HEADERS);
+}
+/***************
+* LOGGING
+***************/
+function logError_(context, writer, detail, reason) {
+const ss = SpreadsheetApp.getActive();
+const sh = getOrCreateSheet_(ss, CONFIG.ERROR_SHEET, ["Timestamp","Context","Writer","Detail","Reason"]);
+sh.appendRow([new Date(), context||"", writer||"", detail||"", reason||""]);
+}
+/***************
+* EMAIL HELPERS
+***************/
+function getEmailFromNV_(nv) {
+const v = (nv?.[CONFIG.Q_EMAIL]?.[0] || "").trim();
+return v.includes("@") ? v : "";
+}
+function sendEmail_(to, subject, htmlBody) {
+if (!to) return;
+const cc = [CONFIG.ADMIN_EMAIL, CONFIG.JOURNAL_EMAIL].filter(e => e && e !== to).join(",");
+MailApp.sendEmail({ to, subject, htmlBody, cc });
+}
+function sendAdminEmail_(subject, htmlBody) {
+MailApp.sendEmail({ to: CONFIG.ADMIN_EMAIL, cc: CONFIG.JOURNAL_EMAIL, subject, htmlBody });
+}
+function sendWriterOnlyEmail_(to, subject, htmlBody) {
+if (!to) return;
+MailApp.sendEmail({ to, subject, htmlBody });
+}
+function emailShell_(title, badge, contentHtml) {
+const badgeHtml = badge
+? `<span style="display:inline-block;background:${badge.bg};color:${badge.fg};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-left:10px;">${badge.label}</span>`
+: "";
+return `
+<div style="font-family:'Georgia',serif;background:#f5f4ef;padding:32px 16px;">
+<div style="max-width:640px;margin:0 auto;">
+<div style="background:#0f1923;padding:20px 28px;border-radius:12px 12px 0 0;">
+<div style="color:#e8e0d0;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">The Advantage Journal</div>
+<div style="color:#ffffff;font-size:20px;font-weight:700;">${title}${badgeHtml}</div>
+</div>
+<div style="background:#ffffff;padding:28px;border-left:1px solid #e2ddd6;border-right:1px solid #e2ddd6;font-size:14px;color:#1a1a1a;line-height:1.7;">
+${contentHtml}
+</div>
+<div style="background:#0f1923;padding:14px 28px;border-radius:0 0 12px 12px;color:#64748b;font-size:11px;">
+The Advantage — Teen Perspectives on Economics &nbsp;·&nbsp; Reply to this email with any questions.
+</div>
+</div>
+</div>`;
+}
+function pill_(label, value) {
+return `<div style="display:inline-block;margin:5px 8px 5px 0;padding:8px 12px;border:1px solid #e2ddd6;border-radius:8px;background:#f9f8f5;">
+<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.6px;">${label}</div>
+<div style="font-weight:700;color:#0f1923;margin-top:2px;font-size:14px;">${value}</div>
+</div>`;
+}
+function button_(label, url, color) {
+return `<a href="${url||"#"}" style="display:inline-block;margin-top:12px;background:${color||"#0f1923"};color:#fff;text-decoration:none;padding:11px 18px;border-radius:8px;font-weight:700;font-size:13px;">${label} →</a>`;
+}
+function urgencyBanner_(msg, color) {
+return `<div style="background:${color||"#dc2626"};color:#fff;padding:12px 16px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:16px;">${msg}</div>`;
+}
+function divider_() {
+return `<div style="border-top:1px solid #e2ddd6;margin:18px 0;"></div>`;
+}
+/***************
+* TRACKER ROW HELPERS
+***************/
+function findTrackerRowByCycleId_(tracker, cycleId) {
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return -1;
+const vals = tracker.getRange(2, CONFIG.COL_CYCLE_ID, lastRow - 1, 1).getValues();
+for (let i = 0; i < vals.length; i++) {
+if ((vals[i][0]||"").toString().trim() === cycleId) return i + 2;
+}
+return -1;
+}
+function parseCycleIdFromAssignment_(label) {
+const m = label.match(/([A-Z]{1,10}-\d{8}-\d{3})/);
+if (m) return m[1];
+throw new Error(`Could not extract Cycle ID from: "${label}"`);
+}
+// All tracker rows for a writer (by name, case-insensitive)
+function findAllRowsForWriter_(tracker, writerName) {
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return [];
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+return vals.reduce((acc, row, i) => {
+if ((row[0]||"").toString().trim().toLowerCase() === writerName.toLowerCase()) acc.push({ row, rowNum: i + 2 });
+return acc;
+}, []);
+}
+function countPublishedForWriter_(tracker, writerName) {
+return findAllRowsForWriter_(tracker, writerName)
+.filter(({ row }) => row[CONFIG.COL_DRAFT_SUBMITTED - 1] === true && row[CONFIG.COL_PUBLISHED_LINK - 1]).length;
+}
+function countOnTimeForWriter_(tracker, writerName) {
+return findAllRowsForWriter_(tracker, writerName)
+.filter(({ row }) => (row[CONFIG.COL_ON_TIME_COUNT - 1] || 0) > 0).length;
+}
+// Recalculate and update streak for writer in a given row
+function recalcStreak_(tracker, writerName) {
+const rows = findAllRowsForWriter_(tracker, writerName)
+.filter(({ row }) => row[CONFIG.COL_DRAFT_SUBMITTED - 1] === true)
+.sort((a, b) => new Date(a.row[CONFIG.COL_SIGNUP_DATE - 1]) - new Date(b.row[CONFIG.COL_SIGNUP_DATE - 1]));
+let streak = 0;
+for (let i = rows.length - 1; i >= 0; i--) {
+const row = rows[i].row;
+const draftSubmittedAt = row[CONFIG.COL_DRAFT_SUBMITTED_AT - 1];
+const draftDue = row[CONFIG.COL_DRAFT_DUE - 1];
+if (draftSubmittedAt instanceof Date && draftDue instanceof Date && draftSubmittedAt <= draftDue) {
+streak++;
+} else {
+break;
+}
+}
+// Write streak to most recent row
+if (rows.length > 0) {
+tracker.getRange(rows[rows.length - 1].rowNum, CONFIG.COL_STREAK).setValue(streak);
+}
+return streak;
+}
+/***************
+* ROSTER HELPERS
+***************/
+function findRosterRow_(roster, writerName) {
+const lastRow = roster.getLastRow();
+if (lastRow < 2) return -1;
+const vals = roster.getRange(2, 1, lastRow - 1, 1).getValues();
+for (let i = 0; i < vals.length; i++) {
+if ((vals[i][0]||"").toString().trim().toLowerCase() === writerName.toLowerCase()) return i + 2;
+}
+return -1;
+}
+function upsertRoster_(writerName, email, tracker) {
+const roster = ensureRosterSheet_();
+const rowNum = findRosterRow_(roster, writerName);
+const rows = findAllRowsForWriter_(tracker, writerName);
+const published = rows.filter(({ row }) => row[CONFIG.COL_PUBLISHED_LINK - 1]).length;
+const totalDone = rows.filter(({ row }) => row[CONFIG.COL_DRAFT_SUBMITTED - 1] === true).length;
+const onTime = rows.filter(({ row }) => {
+const sub = row[CONFIG.COL_DRAFT_SUBMITTED_AT - 1];
+const due = row[CONFIG.COL_DRAFT_DUE - 1];
+return sub instanceof Date && due instanceof Date && sub <= due;
+}).length;
+const streak = recalcStreak_(tracker, writerName);
+const types = [...new Set(rows.map(({ row }) => row[CONFIG.COL_TYPE - 1]).filter(Boolean))].join(", ");
+const lastActive = rows.length > 0
+? rows.sort((a,b) => new Date(b.row[CONFIG.COL_SIGNUP_DATE-1]) - new Date(a.row[CONFIG.COL_SIGNUP_DATE-1]))[0].row[CONFIG.COL_SIGNUP_DATE-1]
+: new Date();
+const status = totalDone >= CONFIG.HALL_OF_FAME_COUNT ? "🏆 Hall of Fame"
+: totalDone > 0 ? "Active"
+: "New";
+const data = [writerName, email, null, status, published, pct_(onTime, totalDone), streak, lastActive, types];
+if (rowNum === -1) {
+data[2] = new Date(); // Join Date
+roster.appendRow(data);
+} else {
+const joinDate = roster.getRange(rowNum, 3).getValue();
+data[2] = joinDate || new Date();
+roster.getRange(rowNum, 1, 1, data.length).setValues([data]);
+}
+}
+/***************
+* ROUTER
+***************/
+function handleAllFormSubmits(e) {
+const shName = e?.range?.getSheet?.().getName?.() || "";
+if (shName === CONFIG.SIGNUP_RESPONSES_SHEET) return handleSignup_(e);
+if (shName === CONFIG.IDEA_RESPONSES_SHEET) return handleIdeas_(e);
+if (shName === CONFIG.DRAFT_RESPONSES_SHEET) return handleDraft_(e);
+}
+/***************
+* SIGNUP HANDLER
+***************/
+function handleSignup_(e) {
+const lock = LockService.getDocumentLock();
+lock.waitLock(15000);
+try {
+const nv = e.namedValues || {};
+const writer = (nv[CONFIG.Q_WRITER]?.[0] || "").trim();
+const email = getEmailFromNV_(nv);
+const type = (nv[CONFIG.Q_TYPE]?.[0] || "").trim();
+const ideaDueRaw = (nv[CONFIG.Q_IDEA_DATE]?.[0] || "").trim();
+const draftDueRaw = (nv[CONFIG.Q_DRAFT_DATE]?.[0] || "").trim();
+if (!writer) throw new Error("Missing Writer Name.");
+if (!email) throw new Error("Missing Email.");
+if (!type) throw new Error("Missing Article Type.");
+const ideaDue = parseDate_(ideaDueRaw);
+const draftDue = parseDate_(draftDueRaw);
+if (!ideaDue) throw new Error(`Could not parse Ideas Due: "${ideaDueRaw}"`);
+if (!draftDue) throw new Error(`Could not parse Draft Due: "${draftDueRaw}"`);
+if (draftDue <= ideaDue) throw new Error("Draft Due must be after Ideas Due.");
+const cycleId = makeCycleId_(writer, ideaDue);
+const signupDate = new Date();
+const tracker = ensureTrackerSheet_();
+// Detect first-timer vs returning
+const allRows = findAllRowsForWriter_(tracker, writer);
+const isNew = allRows.length === 0;
+const next = tracker.getLastRow() + 1;
+tracker.getRange(next, CONFIG.COL_WRITER).setValue(writer);
+tracker.getRange(next, CONFIG.COL_EMAIL).setValue(email);
+tracker.getRange(next, CONFIG.COL_TYPE).setValue(type);
+tracker.getRange(next, CONFIG.COL_CYCLE_ID).setValue(cycleId);
+tracker.getRange(next, CONFIG.COL_SIGNUP_DATE).setValue(signupDate);
+tracker.getRange(next, CONFIG.COL_IDEAS_DUE).setValue(ideaDue);
+tracker.getRange(next, CONFIG.COL_DRAFT_DUE).setValue(draftDue);
+tracker.getRange(next, CONFIG.COL_IDEAS_SUBMITTED).insertCheckboxes().setValue(false);
+tracker.getRange(next, CONFIG.COL_IDEA_APPROVED).insertCheckboxes().setValue(false);
+tracker.getRange(next, CONFIG.COL_DRAFT_SUBMITTED).insertCheckboxes().setValue(false);
+tracker.getRange(next, CONFIG.COL_STATUS).setFormula(statusFormula_(next));
+tracker.getRange(next, CONFIG.COL_TOTAL_ARTICLES).setValue(countPublishedForWriter_(tracker, writer));
+tracker.getRange(next, CONFIG.COL_STREAK).setValue(recalcStreak_(tracker, writer));
+upsertRoster_(writer, email, tracker);
+syncSignupFormDates_();
+syncIdeaFormAssignments_();
+// ── Email: writer confirmation ─────────────────────────────────────────
+const ideaFormUrl = FormApp.openById(CONFIG.IDEA_FORM_ID).getPublishedUrl();
+const draftFormUrl = FormApp.openById(CONFIG.DRAFT_FORM_ID).getPublishedUrl();
+const welcomeSection = isNew
+? `<div style="padding:16px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:6px;">Welcome to The Advantage!</div>
+<p style="margin:0;">We're a teen-led economics journal publishing sharp, original perspectives on the economy.
+Your job is simple: pick an angle, make a clear argument, and back it up.
+We'll take care of the editing — you focus on the ideas.</p>
+</div>`
+: `<div style="padding:14px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;margin-bottom:16px;">
+Welcome back! Great to have you writing again.
+</div>`;
+const writerBody = emailShell_("Signup Confirmed ✓", {label: isNew ? "New Writer" : "Welcome Back", bg: isNew ? "#1d4ed8" : "#16a34a", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — you're confirmed.</p>
+${welcomeSection}
+<div style="display:flex;flex-wrap:wrap;margin-bottom:16px;">
+${pill_("Cycle ID", `<code>${cycleId}</code>`)}
+${pill_("Article Type", type)}
+${pill_("Ideas Due", fmtDate_(ideaDue))}
+${pill_("Draft Due", fmtDate_(draftDue))}
+</div>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:8px;">What to do next</div>
+<ol style="margin:0;padding-left:18px;line-height:2;">
+<li>Submit <b>2 story pitches</b> (title + short description each) by <b>${fmtDate_(ideaDue)}</b>.</li>
+<li>An editor will approve one of your pitches.</li>
+<li>Write your article and submit the Google Doc link by <b>${fmtDate_(draftDue)}</b>.</li>
+</ol>
+</div>
+${isNew ? `<div style="padding:14px;border-radius:10px;background:#fefce8;border:1px solid #fde68a;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:6px;">Tips for a strong pitch</div>
+<ul style="margin:0;padding-left:18px;line-height:1.8;">
+<li>Have a clear, specific argument — not just a topic</li>
+<li>Think about what a teen reader would actually find interesting or surprising</li>
+<li>Economic angles on everyday things (sports, food, social media) tend to work well</li>
+<li>Keep your pitch to 2–3 sentences max</li>
+</ul>
+</div>` : ""}
+${button_("Submit Ideas", ideaFormUrl, "#1d4ed8")}
+<span style="display:inline-block;width:10px;"></span>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:8px;">What to do next</div>
+<ol style="margin:0;padding-left:18px;line-height:2;">
+<li>Click <b>Submit Ideas</b> below. In the form dropdown, find your name — look for exactly:<br><code style="background:#e5e7eb;padding:2px 6px;border-radius:4px;">${writer} — ${Utilities.formatDate(ideaDue, tz_(), "EEE M/d/yyyy")} — ${cycleId}</code></li>
+<li>Submit <b>2 story pitches</b> (title + short description each) by <b>${fmtDate_(ideaDue)}</b>.</li>
+<li>An editor will approve one of your pitches.</li>
+<li>An editor will approve one of your pitches — you'll get an email.</li>
+<li>Write your article and submit the Google Doc link by <b>${fmtDate_(draftDue)}</b>.</li>
+</ol>
+</div>
+const adminBody = emailShell_("New Signup", {label: isNew ? "First Timer" : "Returning", bg:"#1d4ed8", fg:"#fff"}, `
+<p><b>${writer}</b> just signed up.</p>
+<div style="display:flex;flex-wrap:wrap;">
+${pill_("Writer", writer)}
+${pill_("Email", email)}
+${pill_("Type", type)}
+${pill_("Ideas Due", fmtDate_(ideaDue))}
+${pill_("Draft Due", fmtDate_(draftDue))}
+${pill_("First Time?", isNew ? "Yes" : "No")}
+</div>
+`);
+sendAdminEmail_(`The Advantage — New signup: ${writer}`, adminBody);
+recordWeeklyAnalytics_("signups", 1);
+} catch (err) {
+logError_("SIGNUP", e?.namedValues?.[CONFIG.Q_WRITER]?.[0]||"", "", String(err));
+} finally {
+lock.releaseLock();
+}
+}
+/***************
+* ONBOARDING EMAIL SEQUENCE (Days 1, 3, 5 after signup)
+* Stored in PropertiesService as JSON list, processed daily
+***************/
+function scheduleOnboardingEmails_(writer, email, ideaDue) {
+const props = PropertiesService.getScriptProperties();
+const key = "ONBOARDING_QUEUE";
+let queue = [];
+try { queue = JSON.parse(props.getProperty(key) || "[]"); } catch(e) {}
+const now = new Date();
+queue.push({
+writer, email,
+ideaDue: ymd_(ideaDue),
+d1: ymd_(new Date(now.getTime() + 1 * 86400000)),
+d3: ymd_(new Date(now.getTime() + 3 * 86400000)),
+d5: ymd_(new Date(now.getTime() + 5 * 86400000)),
+sentD1: false, sentD3: false, sentD5: false
+});
+props.setProperty(key, JSON.stringify(queue));
+}
+function processOnboardingQueue_() {
+const props = PropertiesService.getScriptProperties();
+const key = "ONBOARDING_QUEUE";
+let queue = [];
+try { queue = JSON.parse(props.getProperty(key) || "[]"); } catch(e) {}
+const todayStr = ymd_(today_());
+let changed = false;
+queue.forEach(item => {
+const ideaFormUrl = FormApp.openById(CONFIG.IDEA_FORM_ID).getPublishedUrl();
+if (!item.sentD1 && item.d1 <= todayStr) {
+sendWriterOnlyEmail_(item.email,
+"The Advantage — What makes a great economics pitch",
+emailShell_("Writing for The Advantage", null, `
+<p>Hi <b>${item.writer}</b> — welcome again! Here's what separates a strong Advantage pitch from a weak one.</p>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:10px;">Strong pitch vs weak pitch</div>
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+<tr style="background:#fee2e2;"><td style="padding:8px;border:1px solid #e2ddd6;">❌ "I want to write about inflation"</td><td style="padding:8px;border:1px solid #e2ddd6;">Too vague — no argument, no angle</td></tr>
+<tr style="background:#dcfce7;"><td style="padding:8px;border:1px solid #e2ddd6;">✅ "I want to argue that Gen Z's relationship with cash is reshaping how central banks think about inflation targets"</td><td style="padding:8px;border:1px solid #e2ddd6;">Specific, arguable, interesting</td></tr>
+<tr style="background:#fee2e2;"><td style="padding:8px;border:1px solid #e2ddd6;">❌ "I want to write about the stock market"</td><td style="padding:8px;border:1px solid #e2ddd6;">Not a pitch — it's a topic</td></tr>
+<tr style="background:#dcfce7;"><td style="padding:8px;border:1px solid #e2ddd6;">✅ "I'll argue that passive index investing is quietly distorting market price discovery in ways most people ignore"</td><td style="padding:8px;border:1px solid #e2ddd6;">Has a real claim to defend</td></tr>
+</table>
+</div>
+<p>Your ideas are due <b>${fmtDate_(parseDate_(item.ideaDue))}</b>. Submit two pitches — we'll approve the stronger one.</p>
+${button_("Submit Your Ideas", ideaFormUrl, "#1d4ed8")}
+`)
+);
+item.sentD1 = true;
+changed = true;
+}
+if (!item.sentD3 && item.d3 <= todayStr) {
+sendWriterOnlyEmail_(item.email,
+"The Advantage — Article types explained",
+emailShell_("Know your article type", null, `
+<p>Hi <b>${item.writer}</b> — here's a quick guide to what each article type means at The Advantage:</p>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+${CONFIG.ARTICLE_TYPES.map(t => `<div style="margin-bottom:10px;"><div style="font-weight:700;">${t}</div><div style="font-size:13px;color:#555;">${articleTypeDesc_(t)}</div></div>`).join("")}
+</div>
+${button_("Submit Your Ideas", ideaFormUrl, "#1d4ed8")}
+`)
+);
+item.sentD3 = true;
+changed = true;
+}
+if (!item.sentD5 && item.d5 <= todayStr) {
+sendWriterOnlyEmail_(item.email,
+"The Advantage — Your ideas are due soon",
+emailShell_("Quick reminder", {label:"Ideas Due Soon", bg:"#d97706", fg:"#fff"}, `
+<p>Hi <b>${item.writer}</b> — your story ideas are due <b>${fmtDate_(parseDate_(item.ideaDue))}</b>. Don't overthink it — two solid pitches is all we need.</p>
+<p>Think about: what economic story have you noticed in your own life lately? What would you want to read that nobody's written yet?</p>
+${button_("Submit Your Ideas", ideaFormUrl, "#d97706")}
+`)
+);
+item.sentD5 = true;
+changed = true;
+}
+});
+// Clean up fully sent items older than 30 days
+const cutoff = ymd_(new Date(today_().getTime() - 30 * 86400000));
+queue = queue.filter(item => !(item.sentD1 && item.sentD3 && item.sentD5 && item.d5 < cutoff));
+if (changed) props.setProperty(key, JSON.stringify(queue));
+}
+function articleTypeDesc_(type) {
+const map = {
+"Opinion / Commentary": "Your argument, your voice. Take a clear stance on an economic issue and defend it.",
+"Economic Analysis": "Break down an economic trend or concept using data, logic, and clear reasoning.",
+"News & Current Events": "Cover a recent economic story — explain what happened, why it matters, and what comes next.",
+"Research Deep-Dive": "Go deep on one topic. Dense, well-sourced, and thorough.",
+"Profile / Interview": "Spotlight a person, company, or institution doing interesting economic work.",
+"Policy Brief": "Evaluate a policy — what's the economic case for or against it?",
+"Economic Explainer": "Make a complex economic concept accessible to a teen audience."
+};
+return map[type] || "A well-argued, well-written economics piece.";
+}
+/***************
+* IDEAS HANDLER
+***************/
+function handleIdeas_(e) {
+try {
+const nv = e.namedValues || {};
+const writer = (nv[CONFIG.Q_WRITER]?.[0] || "").trim();
+const email = getEmailFromNV_(nv);
+const label = (nv[CONFIG.Q_ASSIGN]?.[0] || "").trim();
+const i1t = (nv[CONFIG.Q_IDEA1_TITLE]?.[0] || "").trim();
+const i1p = (nv[CONFIG.Q_IDEA1_PITCH]?.[0] || "").trim();
+const i2t = (nv[CONFIG.Q_IDEA2_TITLE]?.[0] || "").trim();
+const i2p = (nv[CONFIG.Q_IDEA2_PITCH]?.[0] || "").trim();
+if (!writer || !email) throw new Error("Missing writer/email.");
+if (!label || label.startsWith("(No")) throw new Error("No valid assignment.");
+const cycleId = parseCycleIdFromAssignment_(label);
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) throw new Error(`Cycle ID not found: ${cycleId}`);
+tracker.getRange(rowNum, CONFIG.COL_IDEA1_TITLE).setValue(i1t);
+tracker.getRange(rowNum, CONFIG.COL_IDEA1_PITCH).setValue(i1p);
+tracker.getRange(rowNum, CONFIG.COL_IDEA2_TITLE).setValue(i2t);
+tracker.getRange(rowNum, CONFIG.COL_IDEA2_PITCH).setValue(i2p);
+tracker.getRange(rowNum, CONFIG.COL_IDEAS_SUBMITTED_AT).setValue(new Date());
+tracker.getRange(rowNum, CONFIG.COL_IDEAS_SUBMITTED).setValue(true);
+// Track on-time submission
+const ideaDue = tracker.getRange(rowNum, CONFIG.COL_IDEAS_DUE).getValue();
+if (ideaDue instanceof Date && new Date() <= ideaDue) {
+const prev = tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).setValue(Number(prev) + 1);
+} else {
+const prev = tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).setValue(Number(prev) + 1);
+}
+syncIdeaFormAssignments_();
+recordWeeklyAnalytics_("ideas", 1);
+const draftDue = tracker.getRange(rowNum, CONFIG.COL_DRAFT_DUE).getValue();
+const draftFormUrl = FormApp.openById(CONFIG.DRAFT_FORM_ID).getPublishedUrl();
+const ssUrl = SpreadsheetApp.getActive().getUrl();
+// Writer receipt
+const writerBody = emailShell_("Ideas Received ✓", {label:"Pending Approval", bg:"#d97706", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — got your pitches. An editor will review and approve one shortly. You'll get an email once it's approved.</p>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:10px;">Your submitted pitches</div>
+<div style="margin-bottom:12px;">
+<div style="font-weight:700;">1. ${i1t||"(no title)"}</div>
+<div style="color:#444;margin-top:4px;">${i1p||""}</div>
+</div>
+<div>
+<div style="font-weight:700;">2. ${i2t||"(no title)"}</div>
+<div style="color:#444;margin-top:4px;">${i2p||""}</div>
+const prev = tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).setValue(Number(prev) + 1);
+}
+clearLateSent_(cycleId, "ideas");
+syncIdeaFormAssignments_();
+recordWeeklyAnalytics_("ideas", 1);
+const draftDue = tracker.getRange(rowNum, CONFIG.COL_DRAFT_DUE).getValue();
+// Admin approval request
+const adminBody = emailShell_("Ideas Need Approval", {label:"Action Required", bg:"#dc2626", fg:"#fff"}, `
+${urgencyBanner_("Please approve one of these pitches.", "#0f1923")}
+<p>To approve: open the tracker, check "Idea Approved" for this row, then run <code>approveIdea("${cycleId}", "Approved Title Here")</code> from Apps Script.</p>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:10px;">Pitches from ${writer}</div>
+<div style="margin-bottom:12px;">
+<div style="font-weight:700;">1. ${i1t||"(no title)"}</div>
+<div style="color:#444;margin-top:4px;">${i1p||""}</div>
+</div>
+<div>
+<div style="font-weight:700;">2. ${i2t||"(no title)"}</div>
+<div style="color:#444;margin-top:4px;">${i2p||""}</div>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;">
+${pill_("Cycle ID", `<code>${cycleId}</code>`)}
+${pill_("Draft Due", fmtDate_(draftDue))}
+</div>
+${button_("Open Tracker", ssUrl, "#1d4ed8")}
+`);
+sendAdminEmail_(`The Advantage — Ideas to approve: ${writer}`, adminBody);
+} catch (err) {
+logError_("IDEAS", e?.namedValues?.[CONFIG.Q_WRITER]?.[0]||"", e?.namedValues?.[CONFIG.Q_ASSIGN]?.[0]||"", String(err));
+}
+}
+/***************
+* DRAFT HANDLER
+***************/
+function handleDraft_(e) {
+try {
+const nv = e.namedValues || {};
+const writer = (nv[CONFIG.Q_WRITER]?.[0] || "").trim();
+const email = getEmailFromNV_(nv);
+const label = (nv[CONFIG.Q_ASSIGN]?.[0] || "").trim();
+const draftLink = (nv[CONFIG.Q_DRAFT_LINK]?.[0] || "").trim();
+if (!writer || !email) throw new Error("Missing writer/email.");
+if (!label || label.startsWith("(No")) throw new Error("No valid assignment.");
+if (!draftLink) throw new Error("Missing draft link.");
+const cycleId = parseCycleIdFromAssignment_(label);
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) throw new Error(`Cycle ID not found: ${cycleId}`);
+// Allow resubmission — just overwrite
+tracker.getRange(rowNum, CONFIG.COL_DRAFT_LINK).setValue(draftLink);
+tracker.getRange(rowNum, CONFIG.COL_DRAFT_SUBMITTED_AT).setValue(new Date());
+tracker.getRange(rowNum, CONFIG.COL_DRAFT_SUBMITTED).setValue(true);
+// Track on-time
+const draftDue = tracker.getRange(rowNum, CONFIG.COL_DRAFT_DUE).getValue();
+if (draftDue instanceof Date && new Date() <= draftDue) {
+const prev = tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).setValue(Number(prev) + 1);
+} else {
+const prev = tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).setValue(Number(prev) + 1);
+}
+recalcStreak_(tracker, writer);
+upsertRoster_(writer, email, tracker);
+syncDraftFormAssignments_();
+recordWeeklyAnalytics_("drafts", 1);
+const signupDate = tracker.getRange(rowNum, CONFIG.COL_SIGNUP_DATE).getValue();
+const ssUrl = SpreadsheetApp.getActive().getUrl();
+const totalPublished = countPublishedForWriter_(tracker, writer);
+// Writer receipt
+const writerBody = emailShell_("Draft Received ✅", {label:"Editing Queue", bg:"#7c3aed", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — your draft is in. The editing team will review it and your article will be published once it's ready.</p>
+<div style="display:flex;flex-wrap:wrap;margin-bottom:16px;">
+${pill_("Cycle ID", `<code>${cycleId}</code>`)}
+${pill_("Submitted", fmtDate_(new Date()))}
+</div>
+<div style="padding:14px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;">
+<b>Your draft link:</b><br>
+<a href="${draftLink}" style="color:#1d4ed8;word-break:break-all;">${draftLink}</a>
+</div>
+<p style="margin-top:14px;font-size:13px;color:#555;">If you submitted the wrong link, just fill out the draft form again with the correct one — we'll use the latest submission.</p>
+`);
+}
+recalcStreak_(tracker, writer);
+upsertRoster_(writer, email, tracker);
+clearLateSent_(cycleId, "draft");
+syncDraftFormAssignments_();
+recordWeeklyAnalytics_("drafts", 1);
+const signupDate = tracker.getRange(rowNum, CONFIG.COL_SIGNUP_DATE).getValue();
+</div>
+<div style="padding:14px;background:#f9f8f5;border:1px solid #e2ddd6;border-radius:8px;margin-bottom:14px;">
+<a href="${draftLink}" style="color:#1d4ed8;word-break:break-all;">${draftLink}</a>
+</div>
+${button_("Open Draft", draftLink, "#7c3aed")}
+${button_("Open Tracker", ssUrl, "#0f1923")}
+`);
+sendAdminEmail_(`The Advantage — Draft ready: ${writer}`, adminBody);
+} catch (err) {
+logError_("DRAFT", e?.namedValues?.[CONFIG.Q_WRITER]?.[0]||"", e?.namedValues?.[CONFIG.Q_ASSIGN]?.[0]||"", String(err));
+}
+}
+/***************
+* SYNC: Signup form dates
+***************/
+function syncSignupFormDates_() {
+const form = FormApp.openById(CONFIG.SIGNUP_FORM_ID);
+const start = today_();
+const end = new Date(start.getTime() + CONFIG.LOOKAHEAD_DAYS * 86400000);
+const choices = [];
+for (let d = new Date(start); d <= end; d = new Date(d.getTime() + 86400000)) {
+choices.push(fmtShort_(d));
+}
+const lists = form.getItems(FormApp.ItemType.LIST);
+const ideaItem = lists.find(it => it.getTitle() === CONFIG.Q_IDEA_DATE);
+const draftItem = lists.find(it => it.getTitle() === CONFIG.Q_DRAFT_DATE);
+if (ideaItem) ideaItem.asListItem().setChoiceValues(choices);
+if (draftItem) draftItem.asListItem().setChoiceValues(choices);
+}
+/***************
+* SYNC: Idea form assignments
+***************/
+function syncIdeaFormAssignments_() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+const choices = [];
+if (lastRow >= 2) {
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_IDEAS_SUBMITTED).getValues();
+vals.forEach(row => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+const ideaDue = row[CONFIG.COL_IDEAS_DUE-1];
+const submitted= row[CONFIG.COL_IDEAS_SUBMITTED-1] === true;
+const cycleId = (row[CONFIG.COL_CYCLE_ID-1]||"").toString().trim();
+const type = (row[CONFIG.COL_TYPE-1]||"").toString().trim();
+if (!writer || !cycleId || submitted) return;
+choices.push(`${writer} — ${Utilities.formatDate(ideaDue instanceof Date ? ideaDue : new Date(), tz_(), "EEE M/d/yyyy")} — ${cycleId}${type ? " — "+type : ""}`);
+});
+}
+const form = FormApp.openById(CONFIG.IDEA_FORM_ID);
+const item = form.getItems(FormApp.ItemType.LIST).find(it => it.getTitle() === CONFIG.Q_ASSIGN);
+if (!item) throw new Error(`Idea Form: missing dropdown "${CONFIG.Q_ASSIGN}"`);
+item.asListItem().setChoiceValues(choices.length ? choices : ["(No assignments available)"]);
+}
+/***************
+* SYNC: Draft form assignments (idea approved, draft not yet submitted)
+***************/
+function syncDraftFormAssignments_() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+const choices = [];
+if (lastRow >= 2) {
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_DRAFT_SUBMITTED).getValues();
+vals.forEach(row => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+const ideaDue = row[CONFIG.COL_IDEAS_DUE-1];
+const ideaApproved = row[CONFIG.COL_IDEA_APPROVED-1] === true;
+const draftSubmitted= row[CONFIG.COL_DRAFT_SUBMITTED-1] === true;
+const cycleId = (row[CONFIG.COL_CYCLE_ID-1]||"").toString().trim();
+const type = (row[CONFIG.COL_TYPE-1]||"").toString().trim();
+if (!writer || !cycleId || !ideaApproved || draftSubmitted) return;
+choices.push(`${writer} — ${Utilities.formatDate(ideaDue instanceof Date ? ideaDue : new Date(), tz_(), "EEE M/d/yyyy")} — ${cycleId}${type ? " — "+type : ""}`);
+});
+}
+const form = FormApp.openById(CONFIG.DRAFT_FORM_ID);
+const item = form.getItems(FormApp.ItemType.LIST).find(it => it.getTitle() === CONFIG.Q_ASSIGN);
+if (!item) throw new Error(`Draft Form: missing dropdown "${CONFIG.Q_ASSIGN}"`);
+item.asListItem().setChoiceValues(choices.length ? choices : ["(No assignments available)"]);
+}
+/***************
+* DAILY REMINDERS + GHOST DETECTION
+***************/
+function sendDailyReminders() {
+processOnboardingQueue_();
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const ideaFormUrl = FormApp.openById(CONFIG.IDEA_FORM_ID).getPublishedUrl();
+const draftFormUrl = FormApp.openById(CONFIG.DRAFT_FORM_ID).getPublishedUrl();
+const ssUrl = SpreadsheetApp.getActive().getUrl();
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+vals.forEach((row, idx) => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+const email = (row[CONFIG.COL_EMAIL-1]||"").toString().trim();
+const cycleId = (row[CONFIG.COL_CYCLE_ID-1]||"").toString().trim();
+const type = (row[CONFIG.COL_TYPE-1]||"").toString().trim();
+const ideasDue = row[CONFIG.COL_IDEAS_DUE-1];
+const draftDue = row[CONFIG.COL_DRAFT_DUE-1];
+const ideasSubmitted = row[CONFIG.COL_IDEAS_SUBMITTED-1] === true;
+const ideaApproved = row[CONFIG.COL_IDEA_APPROVED-1] === true;
+const draftSubmitted = row[CONFIG.COL_DRAFT_SUBMITTED-1] === true;
+const published = row[CONFIG.COL_PUBLISHED_LINK-1];
+if (!writer || !email || !email.includes("@") || !cycleId || published) return;
+// Ideas reminders
+if (!ideasSubmitted && ideasDue instanceof Date) {
+const d = daysUntil_(ideasDue);
+if (d === 0) {
+sendReminderEmail_(email, writer, cycleId, type, "ideas", ideasDue, 0, ideaFormUrl, ssUrl);
+} else if (d < 0) {
+sendLateNotice_(email, writer, cycleId, type, "ideas", ideasDue, Math.abs(d), ideaFormUrl, ssUrl);
+} else if (CONFIG.IDEA_REMINDERS_DAYS_BEFORE.includes(d)) {
+sendReminderEmail_(email, writer, cycleId, type, "ideas", ideasDue, d, ideaFormUrl, ssUrl);
+}
+}
+// Draft reminders (only after idea approved)
+if (ideaApproved && !draftSubmitted && draftDue instanceof Date) {
+const d = daysUntil_(draftDue);
+if (d === 0) {
+sendReminderEmail_(email, writer, cycleId, type, "draft", draftDue, 0, draftFormUrl, ssUrl);
+} else if (d < 0) {
+sendLateNotice_(email, writer, cycleId, type, "draft", draftDue, Math.abs(d), draftFormUrl, ssUrl);
+} else if (CONFIG.DRAFT_REMINDERS_DAYS_BEFORE.includes(d)) {
+sendReminderEmail_(email, writer, cycleId, type, "draft", draftDue, d, draftFormUrl, ssUrl);
+}
+}
+// Ghost detection: no activity in GHOST_CHECKIN_DAYS
+if (!ideasSubmitted && ideasDue instanceof Date) {
+const signupDate = row[CONFIG.COL_SIGNUP_DATE-1];
+if (d === 0) {
+sendReminderEmail_(email, writer, cycleId, type, "ideas", ideasDue, 0, ideaFormUrl, ssUrl);
+} else if (d < 0) {
+// Only resend late notice once per week — not every single day
+if (!wasLateSentRecently_(cycleId, "ideas")) {
+sendLateNotice_(email, writer, cycleId, type, "ideas", ideasDue, Math.abs(d), ideaFormUrl, ssUrl);
+recordLateSent_(cycleId, "ideas");
+}
+} else if (CONFIG.IDEA_REMINDERS_DAYS_BEFORE.includes(d)) {
+sendReminderEmail_(email, writer, cycleId, type, "ideas", ideasDue, d, ideaFormUrl, ssUrl);
+}
+const urgency = daysLeft <= 1 ? "#dc2626" : daysLeft <= 3 ? "#d97706" : "#1d4ed8";
+const badge = daysLeft === 0 ? `Due TODAY` : `Due in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`;
+const body = emailShell_(`${kindLabel} Reminder`, {label: badge, bg: urgency, fg:"#fff"}, `
+${daysLeft <= 1 ? urgencyBanner_(`Don't miss this — your ${kindLabel.toLowerCase()} are due ${daysLeft === 0 ? "TODAY" : "tomorrow"}.`, urgency) : ""}
+if (d === 0) {
+sendReminderEmail_(email, writer, cycleId, type, "draft", draftDue, 0, draftFormUrl, ssUrl);
+} else if (d < 0) {
+// Only resend late notice once per week — not every single day
+if (!wasLateSentRecently_(cycleId, "draft")) {
+sendLateNotice_(email, writer, cycleId, type, "draft", draftDue, Math.abs(d), draftFormUrl, ssUrl);
+recordLateSent_(cycleId, "draft");
+}
+} else if (CONFIG.DRAFT_REMINDERS_DAYS_BEFORE.includes(d)) {
+sendReminderEmail_(email, writer, cycleId, type, "draft", draftDue, d, draftFormUrl, ssUrl);
+}
+`The Advantage — ${kindLabel} due today: ${writer}`,
+emailShell_(`${kindLabel} Due Today`, {label:"FYI", bg:"#374151", fg:"#fff"}, `<p><b>${writer}</b>'s ${kindLabel.toLowerCase()} for <code>${cycleId}</code> are due today. Reminder sent.${button_("Open Tracker", ssUrl, "#0f1923")}`)
+);
+}
+}
+function sendLateNotice_(email, writer, cycleId, type, kind, dueDate, daysLate, formUrl, ssUrl) {
+const kindLabel = kind === "ideas" ? "Ideas" : "Draft";
+const body = emailShell_(`${kindLabel} Overdue`, {label:`${daysLate}d Late`, bg:"#dc2626", fg:"#fff"}, `
+${urgencyBanner_(`Your ${kindLabel.toLowerCase()} were due ${daysLate} day${daysLate !== 1 ? "s" : ""} ago.`, "#dc2626")}
+<p>Hi <b>${writer}</b> — please submit as soon as possible. If you're having trouble, just reply to this email.</p>
+<div style="display:flex;flex-wrap:wrap;margin-bottom:16px;">
+${pill_("Was Due", fmtDate_(dueDate))}
+${pill_("Days Late", `${daysLate}`)}
+</div>
+const kindLabel = isIdeas ? "Ideas" : "Draft";
+const urgency = daysLeft <= 1 ? "#dc2626" : daysLeft <= 3 ? "#d97706" : "#1d4ed8";
+const badge = daysLeft === 0 ? `Due TODAY` : `Due in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`;
+const formLabel = `${writer} — ${Utilities.formatDate(dueDate, tz_(), "EEE M/d/yyyy")} — ${cycleId}`;
+const body = emailShell_(`${kindLabel} Reminder`, {label: badge, bg: urgency, fg:"#fff"}, `
+${daysLeft <= 1 ? urgencyBanner_(`Don't miss this — your ${kindLabel.toLowerCase()} are due ${daysLeft === 0 ? "TODAY" : "tomorrow"}.`, urgency) : ""}
+<p>Hi <b>${writer}</b> — your <b>${kindLabel.toLowerCase()}</b> are due <b>${fmtDate_(dueDate)}</b>${daysLeft > 0 ? ` (${daysLeft} day${daysLeft !== 1 ? "s" : ""} away)` : " today"}.</p>
+<div style="display:flex;flex-wrap:wrap;">${pill_("Writer", writer)}${pill_("Email", email)}${pill_("Cycle ID", `<code>${cycleId}</code>`)}${pill_("Was Due", fmtDate_(dueDate))}</div>
+${button_("Open Tracker", ssUrl, "#0f1923")}
+${pill_("Article Type", type)}
+${pill_("Due", fmtDate_(dueDate))}
+</div>
+<div style="padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:14px;">
+<b>How to submit:</b> Click the button below, then find your name in the dropdown — look for exactly:<br>
+<code style="background:#e5e7eb;padding:2px 6px;border-radius:4px;">${formLabel}</code>
+</div>
+${button_(`Submit ${kindLabel}`, formUrl, urgency)}
+`);
+sendWriterOnlyEmail_(email, `The Advantage — ${kindLabel} due ${daysLeft === 0 ? "TODAY" : `in ${daysLeft}d`} (${writer})`, body);
+sendWriterOnlyEmail_(email, `The Advantage — Checking in (${writer})`, body);
+sendAdminEmail_(
+`The Advantage — Ghost alert: ${writer}`,
+emailShell_("Ghost Alert", {label:"No Activity", bg:"#374151", fg:"#fff"}, `
+<p><b>${writer}</b> has not submitted ideas ${CONFIG.GHOST_CHECKIN_DAYS} days after signup (cycle <code>${cycleId}</code>). A check-in email was sent.</p>
+${button_("Open Tracker", ssUrl, "#0f1923")}
+}
+function sendLateNotice_(email, writer, cycleId, type, kind, dueDate, daysLate, formUrl, ssUrl) {
+const kindLabel = kind === "ideas" ? "Ideas" : "Draft";
+const formLabel = `${writer} — ${Utilities.formatDate(dueDate, tz_(), "EEE M/d/yyyy")} — ${cycleId}`;
+const body = emailShell_(`${kindLabel} Overdue`, {label:`${daysLate}d Late`, bg:"#dc2626", fg:"#fff"}, `
+${urgencyBanner_(`Your ${kindLabel.toLowerCase()} were due ${daysLate} day${daysLate !== 1 ? "s" : ""} ago.`, "#dc2626")}
+<p>Hi <b>${writer}</b> — please submit as soon as possible. If you're having trouble, just reply to this email.</p>
+const tracker = ensureTrackerSheet_();
+${pill_("Was Due", fmtDate_(dueDate))}
+${pill_("Days Late", `${daysLate}`)}
+</div>
+<div style="padding:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:14px;">
+<b>How to submit:</b> Click the button below, then find your name in the dropdown — look for exactly:<br>
+<code style="background:#e5e7eb;padding:2px 6px;border-radius:4px;">${formLabel}</code><br>
+<span style="font-size:12px;color:#555;">Can't find it? Reply to this email and we'll sort it out.</span>
+</div>
+${button_(`Submit ${kindLabel} Now`, formUrl, "#dc2626")}
+`);
+sendWriterOnlyEmail_(email, `The Advantage — OVERDUE: ${kindLabel} (${writer})`, body);
+// Check they don't have an active cycle
+const active = findAllRowsForWriter_(tracker, writer)
+.filter(({ row: r }) => r[CONFIG.COL_DRAFT_SUBMITTED-1] !== true && r[CONFIG.COL_PUBLISHED_LINK-1] === "");
+if (active.length > 0) return;
+const body = emailShell_("We miss you at The Advantage", null, `
+<p>Hi <b>${writer}</b> — it's been a while! We'd love to have you write for The Advantage again.</p>
+<p>There are open dates available right now. Pick a deadline that works for you and we'll get you back in the pipeline.</p>
+${button_("Sign Up to Write Again", signupFormUrl, "#0f1923")}
+<p style="margin-top:14px;font-size:13px;color:#555;">Not interested anymore? No problem — just ignore this email. We'll stop sending these.</p>
+`);
+sendWriterOnlyEmail_(email, "The Advantage — We'd love to have you back", body);
+});
+}
+/***************
+* DAILY DIGEST (sent to admin every morning)
+***************/
+function sendDailyDigest() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const ssUrl = SpreadsheetApp.getActive().getUrl();
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+const active = vals.filter(r => r[CONFIG.COL_WRITER-1] && !r[CONFIG.COL_PUBLISHED_LINK-1]);
+const lateIdeas = active.filter(r => !r[CONFIG.COL_IDEAS_SUBMITTED-1] && r[CONFIG.COL_IDEAS_DUE-1] instanceof Date && daysUntil_(r[CONFIG.COL_IDEAS_DUE-1]) < 0);
+const lateDrafts = active.filter(r => r[CONFIG.COL_IDEA_APPROVED-1] === true && !r[CONFIG.COL_DRAFT_SUBMITTED-1] && r[CONFIG.COL_DRAFT_DUE-1] instanceof Date && daysUntil_(r[CONFIG.COL_DRAFT_DUE-1]) < 0);
+const awaitApprove = active.filter(r => r[CONFIG.COL_IDEAS_SUBMITTED-1] === true && r[CONFIG.COL_IDEA_APPROVED-1] !== true);
+const dueToday = active.filter(r => {
+const iDue = r[CONFIG.COL_IDEAS_DUE-1];
+const dDue = r[CONFIG.COL_DRAFT_DUE-1];
+return (iDue instanceof Date && daysUntil_(iDue) === 0 && !r[CONFIG.COL_IDEAS_SUBMITTED-1]) ||
+(dDue instanceof Date && daysUntil_(dDue) === 0 && r[CONFIG.COL_IDEA_APPROVED-1] === true && !r[CONFIG.COL_DRAFT_SUBMITTED-1]);
+});
+const inEditing = active.filter(r => r[CONFIG.COL_DRAFT_SUBMITTED-1] === true && !r[CONFIG.COL_PUBLISHED_LINK-1]);
+const tbl = (items, cols, heads) => {
+if (!items.length) return `<div style="color:#888;font-size:13px;padding:8px 0;">None</div>`;
+return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;">
+<thead><tr>${heads.map(h => `<th style="text-align:left;padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">${h}</th>`).join("")}</tr></thead>
+<tbody>${items.map(r => `<tr>${cols.map(c => `<td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${c(r)}</td>`).join("")}</tr>`).join("")}</tbody>
+</table>`;
+};
+const body = emailShell_("Daily Pipeline Digest", {label: new Date().toLocaleDateString("en-US",{weekday:"long"}), bg:"#374151", fg:"#fff"}, `
+<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">
+${pill_("Active Writers", active.length)}
+${pill_("Due Today", dueToday.length)}
+${pill_("Needs Approval", awaitApprove.length)}
+${pill_("Late on Ideas", lateIdeas.length)}
+${pill_("Late on Drafts", lateDrafts.length)}
+${pill_("In Editing", inEditing.length)}
+</div>
+${awaitApprove.length > 0 ? `<div style="margin-bottom:20px;">
+<div style="font-weight:700;margin-bottom:6px;">⏳ Awaiting your approval (${awaitApprove.length})</div>
+${tbl(awaitApprove,
+[r => r[CONFIG.COL_WRITER-1], r => r[CONFIG.COL_IDEA1_TITLE-1]||"—", r => r[CONFIG.COL_IDEA2_TITLE-1]||"—", r => r[CONFIG.COL_CYCLE_ID-1]],
+["Writer","Idea 1","Idea 2","Cycle ID"])}
+</div>` : ""}
+${lateIdeas.length > 0 ? `<div style="margin-bottom:20px;">
+<div style="font-weight:700;color:#dc2626;margin-bottom:6px;">🔴 Late on ideas (${lateIdeas.length})</div>
+${tbl(lateIdeas,
+[r => r[CONFIG.COL_WRITER-1], r => r[CONFIG.COL_EMAIL-1], r => fmtShort_(r[CONFIG.COL_IDEAS_DUE-1])],
+["Writer","Email","Was Due"])}
+</div>` : ""}
+${lateDrafts.length > 0 ? `<div style="margin-bottom:20px;">
+<div style="font-weight:700;color:#dc2626;margin-bottom:6px;">🔴 Late on drafts (${lateDrafts.length})</div>
+${tbl(lateDrafts,
+[r => r[CONFIG.COL_WRITER-1], r => r[CONFIG.COL_EMAIL-1], r => fmtShort_(r[CONFIG.COL_DRAFT_DUE-1])],
+["Writer","Email","Was Due"])}
+</div>` : ""}
+${inEditing.length > 0 ? `<div style="margin-bottom:20px;">
+<div style="font-weight:700;margin-bottom:6px;">📝 In editing queue (${inEditing.length})</div>
+${tbl(inEditing,
+[r => r[CONFIG.COL_WRITER-1], r => r[CONFIG.COL_TYPE-1], r => r[CONFIG.COL_CYCLE_ID-1]],
+["Writer","Type","Cycle ID"])}
+</div>` : ""}
+${button_("Open Tracker", ssUrl, "#0f1923")}
+`);
+sendAdminEmail_("The Advantage — Daily Digest", body);
+}
+/***************
+* PUBLISH ARTICLE — call manually: markPublished("CYCID-...", "https://...", "Article Title", wordCount)
+***************/
+function markPublished(cycleId, liveUrl, articleTitle, wordCount) {
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) { Logger.log(`markPublished: not found: ${cycleId}`); return; }
+const writer = tracker.getRange(rowNum, CONFIG.COL_WRITER).getValue();
+const email = tracker.getRange(rowNum, CONFIG.COL_EMAIL).getValue();
+const type = tracker.getRange(rowNum, CONFIG.COL_TYPE).getValue();
+const title = articleTitle || tracker.getRange(rowNum, CONFIG.COL_IDEA1_TITLE).getValue() || "Untitled";
+tracker.getRange(rowNum, CONFIG.COL_PUBLISHED_LINK).setValue(liveUrl);
+tracker.getRange(rowNum, CONFIG.COL_PUBLISHED_AT).setValue(new Date());
+tracker.getRange(rowNum, CONFIG.COL_TOTAL_ARTICLES).setValue(countPublishedForWriter_(tracker, writer) + 1);
+upsertRoster_(writer, email, tracker);
+updateLeaderboard_();
+checkHallOfFame_(writer, email, tracker);
+checkMilestone_(writer, email, tracker);
+// Log to published sheet
+const pubSheet = ensurePublishedSheet_();
+pubSheet.appendRow([title, writer, type, new Date(), liveUrl, cycleId, wordCount || ""]);
+recordWeeklyAnalytics_("published", 1);
+// Congrats email to writer
+const totalNow = countPublishedForWriter_(tracker, writer);
+const streak = recalcStreak_(tracker, writer);
+const body = emailShell_("Your article is live!", {label:"Published", bg:"#16a34a", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — your article is officially published on The Advantage. Congratulations!</p>
+<div style="padding:16px;border:2px solid #16a34a;border-radius:10px;background:#f0fdf4;margin-bottom:16px;">
+<div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#16a34a;margin-bottom:6px;">Published Article</div>
+<div style="font-weight:700;font-size:16px;">${title}</div>
+<a href="${liveUrl}" style="color:#1d4ed8;font-size:13px;word-break:break-all;">${liveUrl}</a>
+</div>
+<div style="display:flex;flex-wrap:wrap;margin-bottom:16px;">
+${pill_("Article #", `${totalNow}`)}
+${pill_("Current Streak", `${streak} on time`)}
+</div>
+<div style="padding:14px;border-radius:8px;background:#f9f8f5;border:1px solid #e2ddd6;margin-bottom:14px;">
+<b>Add this to your resume:</b><br>
+<span style="font-size:13px;color:#555;">Contributor, The Advantage Journal — <em>${title}</em> (${Utilities.formatDate(new Date(), tz_(), "MMMM yyyy")})</span>
+</div>
+<p style="font-size:13px;color:#555;">Share it, post it, send it to your family. You earned it.</p>
+${button_("Read Your Article", liveUrl, "#16a34a")}
+`);
+sendWriterOnlyEmail_(email, `The Advantage — Your article is live: "${title}"`, body);
+// Instagram caption draft to admin
+const caption = generateInstagramCaption_(title, writer, type, liveUrl);
+sendAdminEmail_(
+`The Advantage — Instagram caption: "${title}"`,
+emailShell_("Instagram Caption Draft", {label:"Social", bg:"#7c3aed", fg:"#fff"}, `
+<p>Here's a caption draft for <b>${writer}</b>'s article. Copy, edit, and post.</p>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;font-family:monospace;white-space:pre-wrap;font-size:13px;line-height:1.6;">${caption}</div>
+`)
+);
+Logger.log(`Published: ${title} by ${writer} (${cycleId})`);
+}
+function generateInstagramCaption_(title, writer, type, url) {
+const typeTag = type.toLowerCase().replace(/[^a-z0-9]/g, "");
+return `New article alert 📊\n\n"${title}"\n\nBy ${writer}\n\nLink in bio 🔗\n\n#TheAdvantage #EconomicsForTeens #TeenJournalism #${typeTag} #Economics #YoungWriters`;
+}
+/***************
+* MILESTONE EMAILS
+***************/
+function checkMilestone_(writer, email, tracker) {
+const total = countPublishedForWriter_(tracker, writer);
+if (!CONFIG.MILESTONE_COUNTS.includes(total)) return;
+const messages = {
+1: { headline: "You published your first article!", sub: "This is just the beginning." },
+3: { headline: "3 articles published!", sub: "You're a regular now." },
+5: { headline: "5 articles published!", sub: "Half a hall of fame." },
+10: { headline: "10 articles published!", sub: "You've earned a permanent spot in our Hall of Fame." },
+20: { headline: "20 articles published!", sub: "Truly legendary. Thank you for everything you've contributed." }
+};
+const msg = messages[total] || { headline: `${total} articles published!`, sub: "Keep going." };
+const body = emailShell_(msg.headline, {label:`${total} Articles`, bg:"#d97706", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — ${msg.sub}</p>
+<div style="text-align:center;padding:32px;background:#fefce8;border:1px solid #fde68a;border-radius:10px;margin:16px 0;">
+<div style="font-size:48px;font-weight:700;color:#0f1923;">${total}</div>
+<div style="font-size:14px;color:#555;margin-top:4px;">articles published in The Advantage</div>
+</div>
+<p style="font-size:13px;color:#555;">You're one of the most consistent writers we have. It means a lot to the publication.</p>
+`);
+sendWriterOnlyEmail_(email, `The Advantage — ${msg.headline}`, body);
+}
+/***************
+* HALL OF FAME
+***************/
+function checkHallOfFame_(writer, email, tracker) {
+const total = countPublishedForWriter_(tracker, writer);
+if (total < CONFIG.HALL_OF_FAME_COUNT) return;
+const hof = ensureHofSheet_();
+const lastRow = hof.getLastRow();
+if (lastRow >= 2) {
+const names = hof.getRange(2, 1, lastRow - 1, 1).getValues().map(r => r[0].toString().trim().toLowerCase());
+if (names.includes(writer.toLowerCase())) return; // Already inducted
+}
+const rows = findAllRowsForWriter_(tracker, writer);
+const onTime = rows.filter(({ row }) => {
+const sub = row[CONFIG.COL_DRAFT_SUBMITTED_AT-1];
+const due = row[CONFIG.COL_DRAFT_DUE-1];
+return sub instanceof Date && due instanceof Date && sub <= due;
+}).length;
+const streak = recalcStreak_(tracker, writer);
+const types = [...new Set(rows.map(({ row }) => row[CONFIG.COL_TYPE-1]).filter(Boolean))].join(", ");
+hof.appendRow([writer, email, new Date(), total, pct_(onTime, rows.filter(r => r.row[CONFIG.COL_DRAFT_SUBMITTED-1] === true).length), streak, types]);
+// Style the new row
+const newRow = hof.getLastRow();
+hof.getRange(newRow, 1, 1, 7).setBackground("#fefce8");
+const body = emailShell_("Welcome to the Hall of Fame", {label:"Hall of Fame", bg:"#d97706", fg:"#fff"}, `
+<div style="text-align:center;padding:32px;background:linear-gradient(135deg,#fefce8,#fde68a);border-radius:12px;margin-bottom:20px;">
+<div style="font-size:40px;">🏆</div>
+<div style="font-size:22px;font-weight:700;margin-top:8px;">Hall of Fame</div>
+<div style="font-size:14px;color:#555;margin-top:4px;">The Advantage Journal</div>
+</div>
+<p>Hi <b>${writer}</b> — with <b>${total} published articles</b>, you've officially been inducted into The Advantage Hall of Fame.</p>
+<p>Your name is now permanently recorded in our Hall of Fame alongside the publication's top contributors. This is a real achievement.</p>
+<div style="display:flex;flex-wrap:wrap;">${pill_("Articles Published", total)}${pill_("On-Time Rate", pct_(onTime, rows.length))}${pill_("Article Types", types)}</div>
+`);
+sendWriterOnlyEmail_(email, "The Advantage — Hall of Fame Induction", body);
+sendAdminEmail_(
+`The Advantage — Hall of Fame: ${writer}`,
+emailShell_("New Hall of Fame Inductee", {label:"🏆 Hall of Fame", bg:"#d97706", fg:"#fff"}, `
+<p><b>${writer}</b> has been inducted into the Hall of Fame with ${total} published articles.</p>
+`)
+);
+}
+/***************
+* LEADERBOARD (refresh monthly or on-demand)
+***************/
+function updateLeaderboard_() {
+const tracker = ensureTrackerSheet_();
+const leaderboard = ensureLeaderboardSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+// Aggregate by writer
+const writerMap = {};
+vals.forEach(row => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+if (!writer) return;
+if (!writerMap[writer]) writerMap[writer] = { published: 0, onTime: 0, total: 0, streak: 0 };
+if (row[CONFIG.COL_PUBLISHED_LINK-1]) writerMap[writer].published++;
+if (row[CONFIG.COL_DRAFT_SUBMITTED-1] === true) {
+writerMap[writer].total++;
+const sub = row[CONFIG.COL_DRAFT_SUBMITTED_AT-1];
+const due = row[CONFIG.COL_DRAFT_DUE-1];
+if (sub instanceof Date && due instanceof Date && sub <= due) writerMap[writer].onTime++;
+}
+const s = Number(row[CONFIG.COL_STREAK-1] || 0);
+if (s > writerMap[writer].streak) writerMap[writer].streak = s;
+});
+const sorted = Object.entries(writerMap)
+.map(([name, d]) => [name, d.published, pct_(d.onTime, d.total), d.streak, d.published >= CONFIG.HALL_OF_FAME_COUNT ? "🏆 Hall of Fame" : "Active"])
+.sort((a, b) => b[1] - a[1]);
+// Clear and rewrite
+const lb = leaderboard;
+if (lb.getLastRow() > 1) lb.getRange(2, 1, lb.getLastRow() - 1, 6).clearContent();
+sorted.forEach((row, i) => {
+lb.appendRow([i + 1, ...row]);
+});
+// Highlight top 3
+sorted.slice(0, 3).forEach((_, i) => {
+const colors = ["#fefce8", "#f1f5f9", "#fff7ed"];
+lb.getRange(i + 2, 1, 1, 6).setBackground(colors[i]);
+});
+}
+/***************
+* WRITER OF THE MONTH (runs 1st of each month)
+***************/
+function writerOfTheMonth() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const now = today_();
+const month = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+const end = new Date(now.getFullYear(), now.getMonth(), 0);
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+const scores = {};
+vals.forEach(row => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+const signupDate = row[CONFIG.COL_SIGNUP_DATE-1];
+const draftSubmitted = row[CONFIG.COL_DRAFT_SUBMITTED-1] === true;
+const submittedAt = row[CONFIG.COL_DRAFT_SUBMITTED_AT-1];
+const draftDue = row[CONFIG.COL_DRAFT_DUE-1];
+const email = (row[CONFIG.COL_EMAIL-1]||"").toString().trim();
+if (!writer || !(signupDate instanceof Date)) return;
+if (signupDate < month || signupDate > end) return;
+if (!draftSubmitted) return;
+if (!scores[writer]) scores[writer] = { count: 0, onTime: 0, email };
+scores[writer].count++;
+if (submittedAt instanceof Date && draftDue instanceof Date && submittedAt <= draftDue) {
+scores[writer].onTime++;
+}
+});
+if (!Object.keys(scores).length) return;
+const winner = Object.entries(scores)
+.sort((a, b) => (b[1].count * 2 + b[1].onTime) - (a[1].count * 2 + a[1].onTime))[0];
+const [name, data] = winner;
+const monthName = fmtMon_(month);
+// Email winner
+const body = emailShell_(`Writer of the Month — ${monthName}`, {label:"WOTM", bg:"#7c3aed", fg:"#fff"}, `
+<div style="text-align:center;padding:28px;background:#f5f3ff;border-radius:12px;margin-bottom:20px;">
+<div style="font-size:36px;">⭐</div>
+<div style="font-size:20px;font-weight:700;margin-top:8px;">Writer of the Month</div>
+<div style="font-size:14px;color:#555;margin-top:4px;">${monthName}</div>
+</div>
+<p>Hi <b>${name}</b> — you've been named The Advantage's Writer of the Month for <b>${monthName}</b>.</p>
+<div style="display:flex;flex-wrap:wrap;">${pill_("Drafts Submitted", data.count)}${pill_("On Time", data.onTime)}</div>
+<p style="margin-top:14px;font-size:13px;color:#555;">This recognition goes to the writer who contributed the most consistently this month. Thank you for your commitment to the publication.</p>
+`);
+sendWriterOnlyEmail_(data.email, `The Advantage — Writer of the Month: ${monthName}`, body);
+// Notify admin
+sendAdminEmail_(
+`The Advantage — Writer of the Month: ${name}`,
+emailShell_("Writer of the Month", {label:monthName, bg:"#7c3aed", fg:"#fff"}, `
+<p><b>${name}</b> is Writer of the Month for ${monthName} with ${data.count} draft${data.count !== 1 ? "s" : ""} submitted (${data.onTime} on time).</p>
+`)
+);
+}
+/***************
+* WRITER SPOTLIGHT (monthly — highlights one writer to editorial team)
+***************/
+function writerSpotlight() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+const published = vals.filter(r => r[CONFIG.COL_PUBLISHED_LINK-1]);
+if (!published.length) return;
+// Pick a random published writer
+const pick = published[Math.floor(Math.random() * published.length)];
+const writer = (pick[CONFIG.COL_WRITER-1]||"").toString().trim();
+const email = (pick[CONFIG.COL_EMAIL-1]||"").toString().trim();
+const rows = findAllRowsForWriter_(tracker, writer).filter(({ row }) => row[CONFIG.COL_PUBLISHED_LINK-1]);
+const total = rows.length;
+const types = [...new Set(rows.map(({ row }) => row[CONFIG.COL_TYPE-1]).filter(Boolean))].join(", ");
+const body = emailShell_(`Writer Spotlight — ${writer}`, {label:"Spotlight", bg:"#0891b2", fg:"#fff"}, `
+<p>This month's writer spotlight goes to <b>${writer}</b>.</p>
+<div style="display:flex;flex-wrap:wrap;margin-bottom:16px;">
+${pill_("Published Articles", total)}
+${pill_("Article Types", types || "—")}
+</div>
+<p style="font-size:13px;color:#555;">The writer spotlight is shared with the editorial team each month to recognize a contributor's work.</p>
+`);
+sendAdminEmail_(`The Advantage — Writer Spotlight: ${writer}`, body);
+}
+/***************
+* TOP ARTICLE OF THE MONTH — call manually: topArticleOfTheMonth("Title Here", "Writer Name", "https://...")
+***************/
+function topArticleOfTheMonth(title, writer, url) {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_EMAIL).getValues();
+const writers = [...new Set(vals.map(r => ({
+name: (r[CONFIG.COL_WRITER-1]||"").trim(),
+email: (r[CONFIG.COL_EMAIL-1]||"").trim()
+})).filter(w => w.name && w.email.includes("@")))];
+const month = fmtMon_(today_());
+writers.forEach(({ name, email }) => {
+const body = emailShell_(`Top Article of the Month — ${month}`, {label:"Top Article", bg:"#16a34a", fg:"#fff"}, `
+<p>Hi <b>${name}</b> — we just wanted to share this month's standout piece.</p>
+<div style="padding:16px;border:2px solid #16a34a;border-radius:10px;background:#f0fdf4;margin-bottom:16px;">
+<div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#16a34a;margin-bottom:4px;">Top Article — ${month}</div>
+<div style="font-weight:700;font-size:15px;">"${title}"</div>
+<div style="font-size:13px;color:#555;margin-top:4px;">by ${writer}</div>
+<a href="${url}" style="color:#1d4ed8;font-size:13px;">${url}</a>
+</div>
+<p style="font-size:13px;color:#555;">If this inspires your next pitch, we'd love to see it.</p>
+`);
+sendWriterOnlyEmail_(email, `The Advantage — Top Article: "${title}"`, body);
+});
+Logger.log(`Top article email sent to ${writers.length} writers.`);
+}
+/***************
+* END OF SEASON WRAP-UP — call manually: sendEndOfSeasonEmails()
+***************/
+function sendEndOfSeasonEmails() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+// Aggregate by writer
+const writerMap = {};
+vals.forEach(row => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+const email = (row[CONFIG.COL_EMAIL-1]||"").toString().trim();
+if (!writer || !email.includes("@")) return;
+if (!writerMap[writer]) writerMap[writer] = { email, articles: 0, onTime: 0, total: 0, types: [] };
+if (row[CONFIG.COL_PUBLISHED_LINK-1]) writerMap[writer].articles++;
+if (row[CONFIG.COL_DRAFT_SUBMITTED-1] === true) {
+writerMap[writer].total++;
+const sub = row[CONFIG.COL_DRAFT_SUBMITTED_AT-1];
+const due = row[CONFIG.COL_DRAFT_DUE-1];
+if (sub instanceof Date && due instanceof Date && sub <= due) writerMap[writer].onTime++;
+}
+const t = row[CONFIG.COL_TYPE-1];
+if (t && !writerMap[writer].types.includes(t)) writerMap[writer].types.push(t);
+});
+Object.entries(writerMap).forEach(([writer, data]) => {
+const onTimeRate = pct_(data.onTime, data.total);
+const body = emailShell_("Your Season at The Advantage", {label:"Season Wrap-Up", bg:"#0f1923", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — here's your personal recap from this season at The Advantage.</p>
+<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">
+${pill_("Articles Published", data.articles)}
+${pill_("On-Time Rate", onTimeRate)}
+${pill_("Article Types", data.types.join(", ")||"—")}
+</div>
+${data.articles > 0 ? `<div style="padding:14px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;margin-bottom:16px;">
+<b>Resume line:</b><br>
+<span style="font-size:13px;color:#555;">Contributor, The Advantage Journal — ${data.articles} article${data.articles !== 1 ? "s" : ""} published (${Utilities.formatDate(new Date(), tz_(), "yyyy")})</span>
+</div>` : ""}
+<p style="font-size:13px;color:#555;">Thank you for being part of The Advantage. We hope to see you back next season.</p>
+`);
+sendWriterOnlyEmail_(data.email, `The Advantage — Your season wrap-up`, body);
+});
+Logger.log(`End-of-season emails sent to ${Object.keys(writerMap).length} writers.`);
+}
+/***************
+* WRITER ALUMNI — call manually: markAlumni("Writer Name", reason)
+***************/
+function markAlumni(writerName, reason) {
+const tracker = ensureTrackerSheet_();
+const roster = ensureRosterSheet_();
+const rowNum = findRosterRow_(roster, writerName);
+if (rowNum === -1) { Logger.log(`markAlumni: not found in roster: ${writerName}`); return; }
+const email = roster.getRange(rowNum, 2).getValue();
+roster.getRange(rowNum, 4).setValue("Alumni");
+// Build their publication record
+const rows = findAllRowsForWriter_(tracker, writerName)
+.filter(({ row }) => row[CONFIG.COL_PUBLISHED_LINK-1]);
+const articleList = rows.map(({ row }) => {
+const title = row[CONFIG.COL_IDEA1_TITLE-1] || "Untitled";
+const url = row[CONFIG.COL_PUBLISHED_LINK-1];
+const date = row[CONFIG.COL_PUBLISHED_AT-1];
+return `<li><a href="${url||"#"}" style="color:#1d4ed8;">${title}</a>${date instanceof Date ? ` — ${fmtShort_(date)}` : ""}</li>`;
+}).join("");
+const body = emailShell_("Thank You From The Advantage", {label:"Alumni", bg:"#374151", fg:"#fff"}, `
+<p>Hi <b>${writerName}</b> — as you move on${reason ? ` (${reason})` : ""}, we wanted to send a proper thank you.</p>
+<p>Writing for a publication isn't easy. You showed up, you met deadlines (mostly!), and you contributed real ideas to real conversations about economics. That matters.</p>
+${rows.length > 0 ? `<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:8px;">Your published articles</div>
+<ul style="margin:0;padding-left:18px;line-height:1.8;">${articleList}</ul>
+</div>` : ""}
+<p style="font-size:13px;color:#555;">These are yours. Add them to your portfolio, your resume, your LinkedIn. You earned every one.</p>
+<p style="font-size:13px;color:#555;">The Advantage door is always open if you want to write again.</p>
+`);
+sendWriterOnlyEmail_(email, "Thank You From The Advantage", body);
+Logger.log(`Alumni email sent to ${writerName}.`);
+}
+/***************
+* WRITER SURVEY — call after markPublished to send a 3-question feedback form
+***************/
+function sendWriterSurvey(cycleId) {
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) return;
+const writer = tracker.getRange(rowNum, CONFIG.COL_WRITER).getValue();
+const email = tracker.getRange(rowNum, CONFIG.COL_EMAIL).getValue();
+const body = emailShell_("Quick feedback request", null, `
+<p>Hi <b>${writer}</b> — now that your article is published, we'd love 60 seconds of your time.</p>
+<div style="padding:16px;border:1px solid #e2ddd6;border-radius:10px;background:#f9f8f5;margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:10px;">3 quick questions</div>
+<ol style="margin:0;padding-left:18px;line-height:2;font-size:13px;">
+<li>How was your overall experience writing for The Advantage? (1–10)</li>
+<li>What was the hardest part of the process?</li>
+<li>Would you write for us again? Any suggestions?</li>
+</ol>
+</div>
+<p style="font-size:13px;color:#555;">Just reply to this email with your answers. We read every response.</p>
+`);
+sendWriterOnlyEmail_(email, "The Advantage — Quick feedback request", body);
+}
+/***************
+* ANALYTICS TRACKING
+***************/
+function recordWeeklyAnalytics_(field, increment) {
+try {
+const sheet = ensureAnalyticsSheet_();
+const weekOf = ymd_(getWeekStart_());
+const lastRow = sheet.getLastRow();
+let targetRow = -1;
+if (lastRow >= 2) {
+const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+for (let i = 0; i < dates.length; i++) {
+if (ymd_(dates[i][0]) === weekOf) { targetRow = i + 2; break; }
+}
+}
+const fieldMap = { signups: 2, ideas: 3, drafts: 4, published: 5, lateIdeas: 6, lateDrafts: 7 };
+const col = fieldMap[field];
+if (!col) return;
+if (targetRow === -1) {
+const newRow = new Array(9).fill(0);
+newRow[0] = weekOf;
+newRow[col - 1] = increment;
+sheet.appendRow(newRow);
+} else {
+const current = sheet.getRange(targetRow, col).getValue() || 0;
+sheet.getRange(targetRow, col).setValue(Number(current) + increment);
+}
+} catch(e) { /* non-critical */ }
+}
+function getWeekStart_() {
+const d = today_();
+const day = d.getDay();
+return new Date(d.getTime() - day * 86400000);
+}
+/***************
+* WEEKLY ANALYTICS REPORT (sent Mondays)
+***************/
+function generateWeeklyReport() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+const ssUrl = SpreadsheetApp.getActive().getUrl();
+const vals = lastRow >= 2 ? tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues() : [];
+const active = vals.filter(r => r[CONFIG.COL_WRITER-1] && !r[CONFIG.COL_PUBLISHED_LINK-1]);
+const lateIdeas = active.filter(r => !r[CONFIG.COL_IDEAS_SUBMITTED-1] && r[CONFIG.COL_IDEAS_DUE-1] instanceof Date && daysUntil_(r[CONFIG.COL_IDEAS_DUE-1]) < 0);
+const lateDrafts = active.filter(r => r[CONFIG.COL_IDEA_APPROVED-1] === true && !r[CONFIG.COL_DRAFT_SUBMITTED-1] && r[CONFIG.COL_DRAFT_DUE-1] instanceof Date && daysUntil_(r[CONFIG.COL_DRAFT_DUE-1]) < 0);
+const awaitApprove = active.filter(r => r[CONFIG.COL_IDEAS_SUBMITTED-1] === true && r[CONFIG.COL_IDEA_APPROVED-1] !== true);
+const totalPublished = vals.filter(r => r[CONFIG.COL_PUBLISHED_LINK-1]).length;
+const totalWriters = [...new Set(vals.map(r => r[CONFIG.COL_WRITER-1]).filter(Boolean))].length;
+// Type breakdown
+const typeBreakdown = {};
+vals.filter(r => r[CONFIG.COL_TYPE-1]).forEach(r => {
+const t = r[CONFIG.COL_TYPE-1];
+typeBreakdown[t] = (typeBreakdown[t] || 0) + 1;
+});
+const typeRows = Object.entries(typeBreakdown)
+.sort((a,b) => b[1] - a[1])
+.map(([t, n]) => `<tr><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${t}</td><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${n}</td></tr>`)
+.join("");
+// Signup velocity (this week vs last week)
+const analyticsSheet = ensureAnalyticsSheet_();
+const aLastRow = analyticsSheet.getLastRow();
+let thisWeekSignups = 0, lastWeekSignups = 0;
+if (aLastRow >= 2) {
+const aVals = analyticsSheet.getRange(2, 1, aLastRow - 1, 2).getValues();
+const thisWeek = ymd_(getWeekStart_());
+const lastWeek = ymd_(new Date(getWeekStart_().getTime() - 7 * 86400000));
+aVals.forEach(r => {
+const w = ymd_(r[0] instanceof Date ? r[0] : new Date(r[0]));
+if (w === thisWeek) thisWeekSignups = r[1];
+if (w === lastWeek) lastWeekSignups = r[1];
+});
+}
+const velocityArrow = thisWeekSignups > lastWeekSignups ? "↑" : thisWeekSignups < lastWeekSignups ? "↓" : "→";
+const velocityColor = thisWeekSignups > lastWeekSignups ? "#16a34a" : thisWeekSignups < lastWeekSignups ? "#dc2626" : "#888";
+const body = emailShell_("Weekly Pipeline Report", {label:"Monday Report", bg:"#374151", fg:"#fff"}, `
+<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">
+${pill_("Total Writers", totalWriters)}
+${pill_("Published", totalPublished)}
+${pill_("Active Now", active.length)}
+${pill_("Needs Approval", awaitApprove.length)}
+${pill_("Late Ideas", lateIdeas.length)}
+${pill_("Late Drafts", lateDrafts.length)}
+</div>
+<div style="margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:6px;">Signup velocity</div>
+<div style="font-size:20px;font-weight:700;color:${velocityColor};">${velocityArrow} ${thisWeekSignups} this week <span style="font-size:13px;color:#888;">vs ${lastWeekSignups} last week</span></div>
+</div>
+${divider_()}
+<div style="margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:6px;">Article type breakdown</div>
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+<thead><tr><th style="text-align:left;padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Type</th><th style="text-align:left;padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Count</th></tr></thead>
+<tbody>${typeRows}</tbody>
+</table>
+</div>
+${awaitApprove.length > 0 ? `${divider_()}<div style="margin-bottom:16px;">
+<div style="font-weight:700;color:#dc2626;margin-bottom:6px;">⏳ Needs your approval (${awaitApprove.length})</div>
+<ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.8;">${awaitApprove.map(r => `<li>${r[CONFIG.COL_WRITER-1]} — <code>${r[CONFIG.COL_CYCLE_ID-1]}</code></li>`).join("")}</ul>
+</div>` : ""}
+${button_("Open Tracker", ssUrl, "#0f1923")}
+${button_("Open Leaderboard", ssUrl + "#gid=leaderboard", "#374151")}
+`);
+sendAdminEmail_("The Advantage — Weekly Pipeline Report", body);
+// Update leaderboard
+updateLeaderboard_();
+}
+/***************
+* INACTIVITY REPORT (monthly)
+***************/
+function sendInactivityReport() {
+const roster = ensureRosterSheet_();
+const lastRow = roster.getLastRow();
+if (lastRow < 2) return;
+const vals = roster.getRange(2, 1, lastRow - 1, 8).getValues();
+const now = today_();
+const inactive30 = [];
+const inactive60 = [];
+const inactive90p = [];
+vals.forEach(row => {
+const writer = (row[0]||"").toString().trim();
+const email = (row[1]||"").toString().trim();
+const status = (row[3]||"").toString();
+const lastActive = row[7];
+if (!writer || status === "Alumni" || !(lastActive instanceof Date)) return;
+const d = daysSince_(lastActive);
+if (d >= 90) inactive90p.push({ writer, email, days: d });
+else if (d >= 60) inactive60.push({ writer, email, days: d });
+else if (d >= 30) inactive30.push({ writer, email, days: d });
+});
+const section = (title, items) => !items.length ? "" : `
+<div style="margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:6px;">${title} (${items.length})</div>
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+<thead><tr><th style="text-align:left;padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Writer</th><th style="text-align:left;padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Days Inactive</th></tr></thead>
+<tbody>${items.map(i => `<tr><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${i.writer}</td><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${i.days}</td></tr>`).join("")}</tbody>
+</table>
+</div>`;
+const body = emailShell_("Writer Inactivity Report", {label:"Monthly", bg:"#374151", fg:"#fff"}, `
+${section("🟡 Inactive 30+ days", inactive30)}
+${section("🟠 Inactive 60+ days", inactive60)}
+${section("🔴 Inactive 90+ days", inactive90p)}
+${(!inactive30.length && !inactive60.length && !inactive90p.length) ? "<p>No inactive writers this month.</p>" : ""}
+`);
+sendAdminEmail_("The Advantage — Writer Inactivity Report", body);
+}
+/***************
+* NEW WRITER CONVERSION RATE REPORT
+***************/
+function generateConversionReport() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+// Group by writer: did they make it to published?
+const writerStatus = {};
+vals.forEach(row => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+if (!writer) return;
+if (!writerStatus[writer]) writerStatus[writer] = { signedUp: true, submittedIdeas: false, submittedDraft: false, published: false, type: row[CONFIG.COL_TYPE-1] };
+if (row[CONFIG.COL_IDEAS_SUBMITTED-1] === true) writerStatus[writer].submittedIdeas = true;
+if (row[CONFIG.COL_DRAFT_SUBMITTED-1] === true) writerStatus[writer].submittedDraft = true;
+if (row[CONFIG.COL_PUBLISHED_LINK-1]) writerStatus[writer].published = true;
+});
+const total = Object.keys(writerStatus).length;
+const ideas = Object.values(writerStatus).filter(w => w.submittedIdeas).length;
+const drafts = Object.values(writerStatus).filter(w => w.submittedDraft).length;
+const published = Object.values(writerStatus).filter(w => w.published).length;
+// By type
+const typeConversion = {};
+Object.values(writerStatus).forEach(w => {
+if (!w.type) return;
+if (!typeConversion[w.type]) typeConversion[w.type] = { total: 0, published: 0 };
+typeConversion[w.type].total++;
+if (w.published) typeConversion[w.type].published++;
+});
+const typeRows = Object.entries(typeConversion)
+.map(([t, d]) => `<tr><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${t}</td><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${pct_(d.published, d.total)}</td><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${d.published}/${d.total}</td></tr>`)
+.join("");
+const body = emailShell_("Writer Conversion Report", {label:"Funnel", bg:"#0891b2", fg:"#fff"}, `
+<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">
+${pill_("Signed Up", total)}
+${pill_("→ Submitted Ideas", `${ideas} (${pct_(ideas, total)})`)}
+${pill_("→ Submitted Draft", `${drafts} (${pct_(drafts, total)})`)}
+${pill_("→ Published", `${published} (${pct_(published, total)})`)}
+</div>
+<div style="margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:6px;">Conversion by article type</div>
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+<thead><tr><th style="text-align:left;padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Type</th><th style="padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Published Rate</th><th style="padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Count</th></tr></thead>
+<tbody>${typeRows}</tbody>
+</table>
+</div>
+`);
+sendAdminEmail_("The Advantage — Writer Conversion Report", body);
+}
+/***************
+* SMART DEADLINE SUGGESTER
+* Analyzes historical data to find which days of the week have the highest on-time rates
+***************/
+function getSmartDeadlineSuggestions() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) { Logger.log("Not enough data yet."); return; }
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+const dayStats = { 0:{name:"Sun",onTime:0,total:0}, 1:{name:"Mon",onTime:0,total:0}, 2:{name:"Tue",onTime:0,total:0},
+3:{name:"Wed",onTime:0,total:0}, 4:{name:"Thu",onTime:0,total:0}, 5:{name:"Fri",onTime:0,total:0}, 6:{name:"Sat",onTime:0,total:0} };
+vals.forEach(row => {
+const sub = row[CONFIG.COL_DRAFT_SUBMITTED_AT-1];
+const due = row[CONFIG.COL_DRAFT_DUE-1];
+if (!(due instanceof Date)) return;
+const dayOfWeek = due.getDay();
+dayStats[dayOfWeek].total++;
+if (sub instanceof Date && sub <= due) dayStats[dayOfWeek].onTime++;
+});
+const sorted = Object.values(dayStats)
+.filter(d => d.total >= 3) // need enough data
+.sort((a, b) => (b.onTime / b.total) - (a.onTime / a.total));
+Logger.log("Best draft due days (by on-time rate):");
+sorted.forEach(d => Logger.log(` ${d.name}: ${pct_(d.onTime, d.total)} on-time (${d.total} samples)`));
+if (sorted.length > 0) {
+sendAdminEmail_(
+"The Advantage — Smart Deadline Suggestions",
+emailShell_("Smart Deadline Suggestions", {label:"Analytics", bg:"#0891b2", fg:"#fff"}, `
+<p>Based on historical submission data, here are the best days of the week for draft deadlines:</p>
+<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;">
+<thead><tr><th style="text-align:left;padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Day</th><th style="padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">On-Time Rate</th><th style="padding:5px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Sample Size</th></tr></thead>
+<tbody>${sorted.map(d => `<tr><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;font-weight:700;">${d.name}</td><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${pct_(d.onTime, d.total)}</td><td style="padding:5px 8px;border-bottom:1px solid #e2ddd6;">${d.total}</td></tr>`).join("")}</tbody>
+</table>
+<p style="font-size:13px;color:#555;">Consider recommending these days when writers pick their deadlines.</p>
+`)
+);
+}
+}
+/***************
+* DEADLINE PRESSURE MAP — logs upcoming deadlines to console + emails admin
+***************/
+function sendDeadlinePressureMap() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+// Next 21 days
+const days = {};
+for (let i = 0; i <= 21; i++) {
+const d = new Date(today_().getTime() + i * 86400000);
+days[ymd_(d)] = { date: d, ideas: [], drafts: [] };
+}
+vals.forEach(row => {
+const writer = (row[CONFIG.COL_WRITER-1]||"").toString().trim();
+if (!writer) return;
+const ideasDue = row[CONFIG.COL_IDEAS_DUE-1];
+const draftDue = row[CONFIG.COL_DRAFT_DUE-1];
+const ideasDone = row[CONFIG.COL_IDEAS_SUBMITTED-1] === true;
+const draftDone = row[CONFIG.COL_DRAFT_SUBMITTED-1] === true;
+const published = row[CONFIG.COL_PUBLISHED_LINK-1];
+if (published) return;
+if (!ideasDone && ideasDue instanceof Date && days[ymd_(ideasDue)]) days[ymd_(ideasDue)].ideas.push(writer);
+if (!draftDone && draftDue instanceof Date && days[ymd_(draftDue)]) days[ymd_(draftDue)].drafts.push(writer);
+});
+const rows = Object.values(days)
+.filter(d => d.ideas.length > 0 || d.drafts.length > 0)
+.map(d => `<tr>
+<td style="padding:6px 8px;border-bottom:1px solid #e2ddd6;font-weight:700;">${Utilities.formatDate(d.date, tz_(), "EEE M/d")}</td>
+<td style="padding:6px 8px;border-bottom:1px solid #e2ddd6;">${d.ideas.length > 0 ? d.ideas.join(", ") : "—"}</td>
+<td style="padding:6px 8px;border-bottom:1px solid #e2ddd6;">${d.drafts.length > 0 ? d.drafts.join(", ") : "—"}</td>
+</tr>`).join("");
+const body = emailShell_("Deadline Pressure Map", {label:"Next 21 Days", bg:"#0891b2", fg:"#fff"}, `
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+<thead><tr>
+<th style="text-align:left;padding:6px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Date</th>
+<th style="text-align:left;padding:6px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Ideas Due</th>
+<th style="text-align:left;padding:6px 8px;background:#f9f8f5;border-bottom:2px solid #e2ddd6;">Drafts Due</th>
+</tr></thead>
+<tbody>${rows || "<tr><td colspan='3' style='padding:8px;color:#888;'>No upcoming deadlines in the next 21 days.</td></tr>"}</tbody>
+</table>
+`);
+sendAdminEmail_("The Advantage — Deadline Pressure Map", body);
+}
+/***************
+* AUTO-ARCHIVE — moves completed cycles to archive sheet
+***************/
+function archiveCompletedCycles() {
+const tracker = ensureTrackerSheet_();
+const archive = getOrCreateSheet_(SpreadsheetApp.getActive(), CONFIG.ARCHIVE_SHEET, CONFIG.TRACKER_HEADERS);
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return;
+const cutoff = new Date(today_().getTime() - 30 * 86400000); // published 30+ days ago
+let archived = 0;
+for (let r = lastRow; r >= 2; r--) {
+const pubLink = tracker.getRange(r, CONFIG.COL_PUBLISHED_LINK).getValue();
+const pubAt = tracker.getRange(r, CONFIG.COL_PUBLISHED_AT).getValue();
+if (pubLink && pubAt instanceof Date && pubAt < cutoff) {
+const rowData = tracker.getRange(r, 1, 1, CONFIG.TRACKER_HEADERS.length).getValues()[0];
+archive.appendRow(rowData);
+tracker.deleteRow(r);
+archived++;
+}
+}
+Logger.log(`Archived ${archived} completed cycle${archived !== 1 ? "s" : ""}.`);
+}
+/***************
+* PIPELINE HEALTH SCORE
+***************/
+function calculateHealthScore() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+if (lastRow < 2) return 0;
+const vals = tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues();
+const active = vals.filter(r => r[CONFIG.COL_WRITER-1] && !r[CONFIG.COL_PUBLISHED_LINK-1]);
+if (!active.length) return 100;
+const onTime = active.filter(r => {
+const sub = r[CONFIG.COL_DRAFT_SUBMITTED_AT-1];
+const due = r[CONFIG.COL_DRAFT_DUE-1];
+return sub instanceof Date && due instanceof Date && sub <= due;
+}).length;
+const submitted = active.filter(r => r[CONFIG.COL_DRAFT_SUBMITTED-1] === true).length;
+const late = active.filter(r =>
+(!r[CONFIG.COL_IDEAS_SUBMITTED-1] && r[CONFIG.COL_IDEAS_DUE-1] instanceof Date && daysUntil_(r[CONFIG.COL_IDEAS_DUE-1]) < 0) ||
+(r[CONFIG.COL_IDEA_APPROVED-1] === true && !r[CONFIG.COL_DRAFT_SUBMITTED-1] && r[CONFIG.COL_DRAFT_DUE-1] instanceof Date && daysUntil_(r[CONFIG.COL_DRAFT_DUE-1]) < 0)
+).length;
+const submissionRate = active.length > 0 ? submitted / active.length : 1;
+const onTimeRate = submitted > 0 ? onTime / submitted : 1;
+const lateRate = active.length > 0 ? late / active.length : 0;
+const score = Math.round((submissionRate * 40 + onTimeRate * 40 + (1 - lateRate) * 20));
+// Log it to analytics
+const analyticsSheet = ensureAnalyticsSheet_();
+const weekOf = ymd_(getWeekStart_());
+const aLastRow = analyticsSheet.getLastRow();
+if (aLastRow >= 2) {
+const dates = analyticsSheet.getRange(2, 1, aLastRow - 1, 1).getValues();
+for (let i = 0; i < dates.length; i++) {
+if (ymd_(dates[i][0]) === weekOf) {
+analyticsSheet.getRange(i + 2, 9).setValue(active.length); // active writers col
+break;
+}
+}
+}
+Logger.log(`Pipeline Health Score: ${score}/100`);
+return score;
+}
+/***************
+* END OF YEAR REPORT — call manually: sendEndOfYearReport()
+***************/
+function sendEndOfYearReport() {
+const tracker = ensureTrackerSheet_();
+const lastRow = tracker.getLastRow();
+const pubSheet = ensurePublishedSheet_();
+const ssUrl = SpreadsheetApp.getActive().getUrl();
+const year = new Date().getFullYear();
+const vals = lastRow >= 2 ? tracker.getRange(2, 1, lastRow - 1, CONFIG.COL_PUBLISHED_AT).getValues() : [];
+const archive = SpreadsheetApp.getActive().getSheetByName(CONFIG.ARCHIVE_SHEET);
+const allVals = archive ? [...vals, ...(archive.getLastRow() >= 2 ? archive.getRange(2,1,archive.getLastRow()-1, CONFIG.TRACKER_HEADERS.length).getValues() : [])] : vals;
+const yearVals = allVals.filter(r => {
+const d = r[CONFIG.COL_SIGNUP_DATE-1];
+return d instanceof Date && d.getFullYear() === year;
+});
+const uniqueWriters = [...new Set(yearVals.map(r => r[CONFIG.COL_WRITER-1]).filter(Boolean))];
+const published = yearVals.filter(r => r[CONFIG.COL_PUBLISHED_LINK-1]).length;
+const onTime = yearVals.filter(r => {
+const sub = r[CONFIG.COL_DRAFT_SUBMITTED_AT-1];
+const due = r[CONFIG.COL_DRAFT_DUE-1];
+return sub instanceof Date && due instanceof Date && sub <= due;
+}).length;
+const totalDrafts = yearVals.filter(r => r[CONFIG.COL_DRAFT_SUBMITTED-1] === true).length;
+// Most productive month
+const monthCounts = {};
+yearVals.filter(r => r[CONFIG.COL_PUBLISHED_LINK-1]).forEach(r => {
+const d = r[CONFIG.COL_PUBLISHED_AT-1];
+if (!(d instanceof Date)) return;
+const m = Utilities.formatDate(d, tz_(), "MMMM");
+monthCounts[m] = (monthCounts[m] || 0) + 1;
+});
+const bestMonth = Object.entries(monthCounts).sort((a,b) => b[1]-a[1])[0];
+// Top writers
+const writerCounts = {};
+yearVals.filter(r => r[CONFIG.COL_PUBLISHED_LINK-1]).forEach(r => {
+const w = (r[CONFIG.COL_WRITER-1]||"").trim();
+writerCounts[w] = (writerCounts[w] || 0) + 1;
+});
+const topWriters = Object.entries(writerCounts).sort((a,b) => b[1]-a[1]).slice(0,5);
+const body = emailShell_(`${year} Year in Review`, {label:"Annual Report", bg:"#0f1923", fg:"#fff"}, `
+<div style="text-align:center;padding:24px;background:#f9f8f5;border-radius:10px;margin-bottom:20px;">
+<div style="font-size:36px;font-weight:700;color:#0f1923;">${year}</div>
+<div style="font-size:14px;color:#555;">The Advantage Annual Report</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;margin-bottom:20px;">
+${pill_("Total Writers", uniqueWriters.length)}
+${pill_("Articles Published", published)}
+${pill_("On-Time Rate", pct_(onTime, totalDrafts))}
+${bestMonth ? pill_("Best Month", `${bestMonth[0]} (${bestMonth[1]} published)`) : ""}
+</div>
+<div style="margin-bottom:16px;">
+<div style="font-weight:700;margin-bottom:6px;">Top contributors</div>
+<ol style="margin:0;padding-left:18px;font-size:13px;line-height:2;">
+${topWriters.map(([w,n]) => `<li><b>${w}</b> — ${n} article${n !== 1 ? "s" : ""}</li>`).join("")}
+</ol>
+</div>
+${button_("Open Tracker", ssUrl, "#0f1923")}
+`);
+sendAdminEmail_(`The Advantage — ${year} Year in Review`, body);
+Logger.log(`Year in review sent for ${year}.`);
+}
+/***************
+* APPROVE IDEA — call manually: approveIdea("CYCID-...", "Approved Title")
+***************/
+function approveIdea(cycleId, approvedTitle) {
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) { Logger.log(`approveIdea: not found: ${cycleId}`); return; }
+const writer = tracker.getRange(rowNum, CONFIG.COL_WRITER).getValue();
+const email = tracker.getRange(rowNum, CONFIG.COL_EMAIL).getValue();
+const draftDue = tracker.getRange(rowNum, CONFIG.COL_DRAFT_DUE).getValue();
+const type = tracker.getRange(rowNum, CONFIG.COL_TYPE).getValue();
+const draftFormUrl = FormApp.openById(CONFIG.DRAFT_FORM_ID).getPublishedUrl();
+tracker.getRange(rowNum, CONFIG.COL_IDEA_APPROVED).setValue(true);
+tracker.getRange(rowNum, CONFIG.COL_IDEA_APPROVED_AT).setValue(new Date());
+syncDraftFormAssignments_();
+const body = emailShell_("Idea Approved ✓", {label:"Approved — Write It!", bg:"#16a34a", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — your pitch has been approved. Here's your assignment:</p>
+<div style="padding:16px;border:2px solid #16a34a;border-radius:10px;background:#f0fdf4;margin-bottom:16px;">
+<div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#16a34a;margin-bottom:6px;">Your approved topic</div>
+<div style="font-weight:700;font-size:16px;">${approvedTitle || "(see editor note)"}</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;margin-bottom:16px;">
+${pill_("Article Type", type)}
+${pill_("Draft Due", fmtDate_(draftDue))}
+${pill_("Cycle ID", `<code>${cycleId}</code>`)}
+</div>
+<div style="padding:14px;border-radius:8px;background:#fefce8;border:1px solid #fde68a;margin-bottom:14px;">
+<b>Writing tips for this type:</b><br>
+<span style="font-size:13px;color:#555;">${articleTypeDesc_(type)}</span>
+</div>
+${button_("Submit Your Draft", draftFormUrl, "#16a34a")}
+`);
+MailApp.sendEmail({ to: email, subject: `The Advantage — Idea approved: "${approvedTitle||"your pitch"}"`, htmlBody: body });
+Logger.log(`Approved: ${writer} / ${cycleId} — "${approvedTitle}"`);
+}
+/***************
+* CANCEL ASSIGNMENT — call manually: cancelAssignment("CYCID-...", "reason")
+***************/
+function cancelAssignment(cycleId, reason) {
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) { Logger.log(`cancelAssignment: not found: ${cycleId}`); return; }
+const writer = tracker.getRange(rowNum, CONFIG.COL_WRITER).getValue();
+const email = tracker.getRange(rowNum, CONFIG.COL_EMAIL).getValue();
+tracker.getRange(rowNum, CONFIG.COL_NOTES).setValue(`Cancelled: ${reason||"no reason"} — ${fmtDate_(new Date())}`);
+syncIdeaFormAssignments_();
+syncDraftFormAssignments_();
+if (email && email.includes("@")) {
+MailApp.sendEmail({
+to: email,
+subject: `The Advantage — Assignment update (${cycleId})`,
+htmlBody: emailShell_("Assignment Cancelled", {label:"Cancelled", bg:"#dc2626", fg:"#fff"}, `
+<p>Hi <b>${writer}</b> — your assignment <code>${cycleId}</code> has been removed${reason ? `: ${reason}` : ""}. If you think this is a mistake, reply to this email.</p>
+`)
+});
+}
+Logger.log(`Cancelled ${cycleId} for ${writer}.`);
+}
+/***************
+* SYNC ALL FORMS
+***************/
+function syncAllForms() {
+syncSignupFormDates_();
+syncIdeaFormAssignments_();
+syncDraftFormAssignments_();
+Logger.log("All forms synced.");
+}
+/***************
+* TRIGGER SETUP — run once
+***************/
+function createTriggers() {
+ScriptApp.getProjectTriggers().forEach(t => {
+const fn = t.getHandlerFunction();
+if ([
+"handleAllFormSubmits","sendDailyReminders","sendDailyDigest",
+"syncAllForms","generateWeeklyReport","writerOfTheMonth",
+"writerSpotlight","sendInactivityReport","archiveCompletedCycles",
+"processOnboardingQueue_"
+].includes(fn)) ScriptApp.deleteTrigger(t);
+});
+const ss = SpreadsheetApp.getActive();
+// Form submissions
+ScriptApp.newTrigger("handleAllFormSubmits").forSpreadsheet(ss).onFormSubmit().create();
+// 6am — form sync
+ScriptApp.newTrigger("syncAllForms").timeBased().everyDays(1).atHour(6).create();
+// 7am — daily digest to admin
+ScriptApp.newTrigger("sendDailyDigest").timeBased().everyDays(1).atHour(7).create();
+// 8am — writer reminders + ghost detection + "we miss you"
+ScriptApp.newTrigger("sendDailyReminders").timeBased().everyDays(1).atHour(8).create();
+// Monday 9am — weekly report + leaderboard update
+ScriptApp.newTrigger("generateWeeklyReport").timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).create();
+// 1st of each month — writer of the month + spotlight + inactivity report
+ScriptApp.newTrigger("writerOfTheMonth").timeBased().onMonthDay(1).atHour(10).create();
+ScriptApp.newTrigger("writerSpotlight").timeBased().onMonthDay(1).atHour(10).create();
+ScriptApp.newTrigger("sendInactivityReport").timeBased().onMonthDay(1).atHour(11).create();
+// 15th of each month — auto-archive old published cycles
+ScriptApp.newTrigger("archiveCompletedCycles").timeBased().onMonthDay(15).atHour(6).create();
+Logger.log("All triggers created successfully.");
+}
+ 
+Logger.log("All forms synced.");
+}
+/***************
+* MANUAL SUBMISSION OVERRIDES
+* Use these when a writer submits via email or you need to bypass the form.
+* manualMarkIdeasSubmitted("CYCLEID", "Idea 1 title", "Idea 1 pitch", "Idea 2 title", "Idea 2 pitch")
+* manualMarkDraftSubmitted("CYCLEID", "https://docs.google.com/...")
+***************/
+function manualMarkIdeasSubmitted(cycleId, idea1Title, idea1Pitch, idea2Title, idea2Pitch) {
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) { Logger.log(`manualMarkIdeasSubmitted: not found: ${cycleId}`); return; }
+if (idea1Title) tracker.getRange(rowNum, CONFIG.COL_IDEA1_TITLE).setValue(idea1Title);
+if (idea1Pitch) tracker.getRange(rowNum, CONFIG.COL_IDEA1_PITCH).setValue(idea1Pitch);
+if (idea2Title) tracker.getRange(rowNum, CONFIG.COL_IDEA2_TITLE).setValue(idea2Title);
+if (idea2Pitch) tracker.getRange(rowNum, CONFIG.COL_IDEA2_PITCH).setValue(idea2Pitch);
+tracker.getRange(rowNum, CONFIG.COL_IDEAS_SUBMITTED_AT).setValue(new Date());
+tracker.getRange(rowNum, CONFIG.COL_IDEAS_SUBMITTED).setValue(true);
+const ideaDue = tracker.getRange(rowNum, CONFIG.COL_IDEAS_DUE).getValue();
+if (ideaDue instanceof Date && new Date() <= ideaDue) {
+const prev = tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).setValue(Number(prev) + 1);
+} else {
+const prev = tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).setValue(Number(prev) + 1);
+}
+clearLateSent_(cycleId, "ideas");
+syncIdeaFormAssignments_();
+recordWeeklyAnalytics_("ideas", 1);
+Logger.log(`Manually marked ideas submitted: ${cycleId}`);
+}
+function manualMarkDraftSubmitted(cycleId, draftLink) {
+const tracker = ensureTrackerSheet_();
+const rowNum = findTrackerRowByCycleId_(tracker, cycleId);
+if (rowNum === -1) { Logger.log(`manualMarkDraftSubmitted: not found: ${cycleId}`); return; }
+const writer = tracker.getRange(rowNum, CONFIG.COL_WRITER).getValue();
+const email = tracker.getRange(rowNum, CONFIG.COL_EMAIL).getValue();
+if (draftLink) tracker.getRange(rowNum, CONFIG.COL_DRAFT_LINK).setValue(draftLink);
+tracker.getRange(rowNum, CONFIG.COL_DRAFT_SUBMITTED_AT).setValue(new Date());
+tracker.getRange(rowNum, CONFIG.COL_DRAFT_SUBMITTED).setValue(true);
+const draftDue = tracker.getRange(rowNum, CONFIG.COL_DRAFT_DUE).getValue();
+if (draftDue instanceof Date && new Date() <= draftDue) {
+const prev = tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_ON_TIME_COUNT).setValue(Number(prev) + 1);
+} else {
+const prev = tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).getValue() || 0;
+tracker.getRange(rowNum, CONFIG.COL_LATE_COUNT).setValue(Number(prev) + 1);
+}
+clearLateSent_(cycleId, "draft");
+recalcStreak_(tracker, writer);
+upsertRoster_(writer, email, tracker);
+syncDraftFormAssignments_();
+recordWeeklyAnalytics_("drafts", 1);
+Logger.log(`Manually marked draft submitted: ${cycleId}`);
+}
+/***************
+* TRIGGER SETUP — run once
+***************/
+function createTriggers() 
